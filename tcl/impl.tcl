@@ -1,7 +1,7 @@
 open_project ./vivado/un_risc5.xpr
 
 # Launch implementation (from last synthesis results)
-launch_runs impl_1 -to_step write_bitstream -jobs 8
+launch_runs impl_1 -to_step write_bitstream -jobs 8 -verbose
 
 # Wait for implementation to finish
 wait_on_run impl_1
@@ -14,4 +14,4 @@ report_drc -file ./vivado/reports/drc/impl_drc.rpt
 write_bitstream -force un_risc5.bi
 
 # Write bitstream
-write_bitstream -force ../vivado/un_risc5.bit
+write_bitstream -force ./vivado/un_risc5.bit

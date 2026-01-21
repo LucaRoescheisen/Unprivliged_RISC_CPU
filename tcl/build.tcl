@@ -14,3 +14,4 @@ add_files -fileset constrs_1 ./constr/Arty-S7-50-Master.xdc
    # source $ip_script
 #}
 update_compile_order -fileset sources_1
+check_syntax -fileset sources_1
