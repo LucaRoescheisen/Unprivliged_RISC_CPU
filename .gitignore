@@ -1,0 +1,5 @@
+vivado/
+dfx_runtime
+.vscode/
+.Xil/
+logs/

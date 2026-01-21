@@ -1,0 +1,1 @@
+vivado -mode batch -source tcl/build.tcl -journal D:/HDL_Environment/logs/vivado_build.jou -log D:/HDL_Environment/logs/vivado_build.log
