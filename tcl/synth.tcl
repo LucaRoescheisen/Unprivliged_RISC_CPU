@@ -1,4 +1,4 @@
-open_project ../vivado/un_risc5.xpr
+open_project ./vivado/un_risc5.xpr
 
 # Reset previous synthesis run
 reset_run synth_1
