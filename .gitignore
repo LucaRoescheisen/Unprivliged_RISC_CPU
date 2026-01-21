@@ -1,5 +1,5 @@
 vivado/
-dfx_runtime
+dfx_runtime.txt
 .vscode/
 .Xil/
 logs/
