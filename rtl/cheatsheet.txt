@@ -1,0 +1,10 @@
+rd  : destination
+rs1 : source register
+rs2 : immediate
+
+
+R-type Instruction
+funct7[31:25] rs2[24:20] rs1[19:15] funct3[14:12] rd[11:7] opcode[6:0]
+
+I-type Instruction
+imm[31:20] rs1[19:15] funct3[14:12] rd[11:7] opcode[6:0]
