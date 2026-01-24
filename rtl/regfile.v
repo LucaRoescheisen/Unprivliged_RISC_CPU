@@ -9,7 +9,7 @@ module regfile(
   output  [31:0] rs2_val
 );
 /*
-x1 : Return Address Register
+x1 : Return Address Register never write to THIS!!!!!
 x2 : Standard Stack Pointer
 x5 : Alternative Link Register (some programs use this instead of x1)
 
@@ -17,16 +17,20 @@ x5 : Alternative Link Register (some programs use this instead of x1)
 */
 localparam XLEN = 32;
 
-reg [XLEN-1:0] int_regs [0:32];         //x0 to x32
-
-always @(posedge clk) int_regs[0] <= 0; //Forces x0 to be always 0
+(* dont_touch = "true" *) reg [XLEN-1:0] int_regs [0:32];         //x0 to x32
+integer i;
+initial begin
+    for (i = 0; i < 32; i = i + 1) begin
+        int_regs[i] = 32'b0;
+    end
+end
 
 assign rs1_val = int_regs[rs1];
 assign rs2_val = int_regs[rs2];
 
 
 always @(posedge clk) begin
-  if (reg_write) begin
+  if (reg_write && rd != 0) begin
     int_regs[rd] <= result;
 
   end

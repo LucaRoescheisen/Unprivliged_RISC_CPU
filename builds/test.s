@@ -1,29 +1,20 @@
-.section .text
-.globl _start
+addi x2, x0, 10     # Setup: x2 = 10
 
-_start:
+    # 1. CALL THE FUNCTION
+    jal x1, add_five    # Jump to 'add_five', save 'AfterFunc' address in x1
 
-addi x1, x0, -1
-addi x2, x0, 1
-slt  x3, x1, x2
-sltu x4, x1, x2
+AfterFunc:
+    # 3. CHECK IF WE BACK
+    # If the CPU returns correctly, it executes this line.
+    addi x2, x2, 100    # x2 should now be 15 + 100 = 115
 
-slti x5, x1, 1
-sltiu x6, x1, 1
+    jal x0, end         # Jump to end to avoid falling into the function again
 
-addi x7, x0, 1
-addi x8, x0, 32
-sll x9, x7, x8
-addi x8, x0, 33
-sll  x10, x7, x8
-
-addi x11, x0, -1
-addi x12, x0, 2047
-addi x13, x0, -2048
-
-addi x14, x0, -8
-srai x15, x14, 1
-srli x16, x14, 1
+# --- THE FUNCTION ---
+add_five:
+    addi x2, x2, 5      # x2 = 10 + 5 = 15
+    # 2. RETURN
+    jalr x0, x1, 0      # Jump to the address in x1 (AfterFunc)
 
 end:
-    j end
+    jal x0, end         # Final parking spot

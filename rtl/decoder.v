@@ -4,14 +4,29 @@ module decoder(
   output reg [3:0] rs1,
   output reg [3:0] rs2,
   output reg [31:0] imm,
-  output reg [5:0] alu_op,
+  output reg [4:0] alu_op,
   output reg reg_write,
   output reg alu_src,
-  output reg [2:0] b_type
+  output reg [2:0] b_type,
+  output reg is_branch,
+  output reg jal_jump,
+  output reg jalr_jump
 );
+
+  initial begin
+    jal_jump = 0;
+    jalr_jump = 0;
+  end
 
   //Check Type:
 always @(*) begin //Anytime the input signal changes
+  rd = 0; rs1 = 0; rs2 = 0; imm = 0;        //Prevent latches
+  alu_op = 0; reg_write = 0; is_branch = 0;
+  alu_src = 0; b_type = 0; jalr_jump = 0;
+  jal_jump = 0;
+
+
+
   case(instr[6:0])     //Identify OP code
     7'b0110011: begin //ALU R-Type
       rd  = instr[11:7];
@@ -25,21 +40,42 @@ always @(*) begin //Anytime the input signal changes
       imm = {{20{instr[31]}}, instr[31:20]};
       reg_write = 1;
     end
-    7'1100011: begin  //ALU I-Type
+    7'b1100011: begin  //ALU B-Type
       rs1 = instr[19:15];
       rs2 = instr[24:20];
-      imm = { 20{instr[31]},instr[7], instr[30:25], instr[11:8], 0};
+      imm = { {20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0 }; //Add 1'b0 to shift right (2x's jump value)
       reg_write = 0;
+      is_branch = 1;
     end
+    7'b1101111: begin  //J-Type format : JAL
+      rd = instr[11:7];
+      imm = { {11{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0 };
+      jal_jump = 1'b1;
+      reg_write = 1;
+    end
+
+    7'b1100111: begin // I-Type format : JALR
+      rd = instr[11:7];
+      rs1 = instr[19:15];
+      imm = {{20{instr[31]}}, instr[31:20]};
+      jalr_jump = 1'b1;
+      reg_write = 1;
+    end
+
+
+
     default begin
-      reg_write = 0;
+      reg_write = 1'b0;
+      is_branch = 1'b0;
+      jal_jump  = 1'b0;
+      jalr_jump = 1'b0;
+      rs1 = 4'bx;
+      rs2 = 4'bx;
+      imm = 31'bx;
     end
   endcase
-end
 
-
-always @(*) begin
-  case(instr[6:0])  //Check OP Code again
+   case(instr[6:0])  //Check OP Code again
     7'b0110011 : begin // R-Type
       case(instr[14:12]) //func3
         3'b000 : begin
@@ -83,16 +119,17 @@ always @(*) begin
     end
 
     7'b1100011: begin //B-Type
-          b_type = instr[14:12];
+      b_type = instr[14:12];
     end
 
-    default:
-      b_type = 3'b000;
-      endcase
-    end
 
-always @(*) begin
-  alu_src = 0;
+
+    default: begin
+      alu_op = 5'bx;
+      b_type = 3'bx;
+    end
+  endcase
+
 
   case (instr[6:0])
     7'b0110011: alu_src = 0; // R-type
@@ -102,5 +139,7 @@ always @(*) begin
     7'b1100011: alu_src = 0;// B-TYPE
   endcase
 end
+
+
 
 endmodule
