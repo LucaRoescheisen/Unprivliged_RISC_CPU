@@ -10,7 +10,10 @@ module decoder(
   output reg [2:0] b_type,
   output reg is_branch,
   output reg jal_jump,
-  output reg jalr_jump
+  output reg jalr_jump,
+  output reg decoder_illegal,
+  output reg is_load,
+   output reg is_store
 );
 
   initial begin
@@ -62,9 +65,18 @@ always @(*) begin //Anytime the input signal changes
       reg_write = 1;
     end
 
+    7'b0000011: begin // I-type : LOAD
+      is_load = 1'b0;
 
+    end
+
+    7'b0100011 begin //S-Type : STORE
+      is_store = 1'b0;
+    end
 
     default begin
+      is_load = 1'b0;
+      is_store = 1'b0;
       reg_write = 1'b0;
       is_branch = 1'b0;
       jal_jump  = 1'b0;
@@ -72,6 +84,8 @@ always @(*) begin //Anytime the input signal changes
       rs1 = 4'bx;
       rs2 = 4'bx;
       imm = 31'bx;
+
+      decoder_illegal = 1;
     end
   endcase
 

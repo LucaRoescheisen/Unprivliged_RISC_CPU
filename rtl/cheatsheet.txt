@@ -8,3 +8,39 @@ funct7[31:25] rs2[24:20] rs1[19:15] funct3[14:12] rd[11:7] opcode[6:0]
 
 I-type Instruction
 imm[31:20] rs1[19:15] funct3[14:12] rd[11:7] opcode[6:0]
+
+
+
+
+Load:
+  According to manual: The effective address is obtained by adding register rs1 to the
+  sign-extended 12-bit offset.
+  Reason being, lets say you have the following:
+  struct Student {
+    int id,     //Offset 0
+    int grade,  //Offset 4 bytes
+    int age     //Offset 8 bytes
+  }
+  In asm it looks like this:
+  lw x5, 0(x10)      # Load ID    (Address: x10 + 0)
+  lw x6, 4(x10)      # Load Grade (Address: x10 + 4)
+  lw x7, 8(x10)      # Load Age (Address: x10 + 8)
+  We add rs1 to offset to quickly and efficienctly find another value that is part of the data structure.
+
+
+
+  Goals:
+    FSM
+    S-type
+    B-type
+    U-type
+    IR
+    M Extension
+    Pipelining
+    CSRs
+    Timers and Interrupts
+    I/O, UART
+    Virtual Memory
+    Caching
+    Bootloader
+    OS
