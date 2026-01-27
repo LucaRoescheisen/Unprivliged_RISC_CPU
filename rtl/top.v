@@ -1,16 +1,18 @@
 module top(
-  input clk
+  input clk,
+  input reset
 );
   (* dont_touch = "true" *) reg [31:0] pc = 0; //Program counter (Holds address of current instruction)
 
   reg [31:0] instr [0:17];
   wire [31:0] current_instr;
-  wire [31:0] IR;
+  reg [31:0] IR;
 
   wire [3:0] rs1, rs2, rd;
   wire [31:0] rs1_val, rs2_val;
   wire[31:0] imm;
   wire[31:0] alu_result;
+  reg[31:0] alu_output_reg;
   wire reg_write;
   wire [31:0] pc_jump;
   wire [4:0] alu_op;
@@ -28,7 +30,7 @@ module top(
 
   //Result Handling
   wire [31:0] reg_write_data;
-  assign reg_write_data = (jal_jump || jalr_jump) ? (pc + 4) : alu_result;
+  assign reg_write_data = (jal_jump || jalr_jump) ? (pc + 4) : alu_output_reg; //OR alu_result
 
   //FSM CONTROLS
   wire [2:0] state; //FSM current state
@@ -36,6 +38,14 @@ module top(
   wire div_busy;
   wire is_load_store;
   wire decoder_illegal;
+
+
+localparam FETCH      = 3'b000,
+           DECODE     = 3'b001,
+           EXECUTE    = 3'b010,
+           WRITE_BACK = 3'b011, //when saved to regfile
+           MEM_WAIT   = 3'b100,
+           TRAP       = 3'b101;
 
 
   initial begin
@@ -46,7 +56,7 @@ module top(
   assign current_instr = instr[pc >> 2];  //Fetch current instruction
   always @(posedge clk) begin
     if(state ==FETCH) begin
-      IR <= current_instr
+      IR <= current_instr;
     end
   end
 
@@ -60,20 +70,30 @@ module top(
       alu_output_reg <= alu_result;
     end
   end
-
+  wire is_load, is_store;
   wire mem_read_en = (state ==EXECUTE || state == MEM_WAIT) && is_load;
   wire mem_write_en = (state ==EXECUTE || state == MEM_WAIT) && is_store;
   assign is_load_store = mem_read_en || mem_write_en;
 
-
+  wire [31:0] ram_address_store;
+  wire [31:0] ram_data_in;
+  wire [31:0] ram_data_out;
+  wire [2:0 ] load_type;
+  wire [2:0 ] store_type;
+  wire [31:0] ram_address_load;
+  assign ram_address_store = rs1_val + imm;
+  assign ram_data_in = rs2_val;
   (* dont_touch = "true" *)
   data_memory data_memory_module(
     .clk(clk),
+    .load_type(load_type),
+    .store_type(store_type),
     .mem_read_en(mem_read_en),
     .mem_write_en(mem_write_en),
-    .addr(ram_address), //TODO
+    .ram_address_store(ram_address_store),
+    .ram_address_load(ram_address_load),
     .data_in(ram_data_in),
-    .data_out(ram_data_out)
+    .data_out(ram_data_out),
     .mem_busy(mem_busy)
   );
 
@@ -109,7 +129,9 @@ module top(
     .jalr_jump(jalr_jump),
     .decoder_illegal(decoder_illegal),
     .is_load(is_load),
-    .is_store(is_store)
+    .is_store(is_store),
+    .load_type(load_type),
+    .store_type(store_type)
   );
 
 
@@ -130,6 +152,8 @@ module top(
     .rs2_val(rs2_val),
     .take_branch(take_branch)
   );
+
+
 
   (* dont_touch = "true" *)
   fsm fsm_module(

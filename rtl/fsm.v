@@ -5,7 +5,7 @@ module fsm(
   input div_busy,
   input mem_busy,
   input is_load_store,
-  output wire [2:0] state
+  output reg [2:0] state
 );
 
 reg [2:0] next_state;

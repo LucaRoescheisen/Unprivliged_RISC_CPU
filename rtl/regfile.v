@@ -7,7 +7,7 @@ module regfile(
   input reg_write,
   input [2:0] state,
   output  [31:0] rs1_val,
-  output  [31:0] rs2_val,
+  output  [31:0] rs2_val
 );
 /*
 x1 : Return Address Register never write to THIS!!!!!
@@ -16,6 +16,14 @@ x5 : Alternative Link Register (some programs use this instead of x1)
 
 
 */
+
+localparam FETCH      = 3'b000,
+           DECODE     = 3'b001,
+           EXECUTE    = 3'b010,
+           WRITE_BACK = 3'b011, //when saved to regfile
+           MEM_WAIT   = 3'b100,
+           TRAP       = 3'b101;
+
 localparam XLEN = 32;
 
 (* dont_touch = "true" *) reg [XLEN-1:0] int_regs [0:32];         //x0 to x32

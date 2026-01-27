@@ -27,7 +27,7 @@ Load:
   lw x7, 8(x10)      # Load Age (Address: x10 + 8)
   We add rs1 to offset to quickly and efficienctly find another value that is part of the data structure.
 
-
+  Store instructions, store a value from regfile
 
   Goals:
     FSM

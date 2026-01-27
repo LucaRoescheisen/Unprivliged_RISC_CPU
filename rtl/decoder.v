@@ -13,7 +13,10 @@ module decoder(
   output reg jalr_jump,
   output reg decoder_illegal,
   output reg is_load,
-   output reg is_store
+  output reg is_store,
+  output reg [2:0] load_type,
+  output reg [2:0] store_type,
+  output reg [31:0] ram_address_load
 );
 
   initial begin
@@ -27,21 +30,23 @@ always @(*) begin //Anytime the input signal changes
   alu_op = 0; reg_write = 0; is_branch = 0;
   alu_src = 0; b_type = 0; jalr_jump = 0;
   jal_jump = 0;
-
-
-
+  is_load = 0; ram_address_load = 0; load_type = 0;
+  is_store = 0; decoder_illegal = 0;
+  store_type= 0;
   case(instr[6:0])     //Identify OP code
     7'b0110011: begin //ALU R-Type
       rd  = instr[11:7];
       rs1 = instr[19:15];
       rs2 = instr[24:20];
       reg_write = 1;
+      decoder_illegal = 0;
     end
     7'b0010011: begin  //ALU I-Type
       rd  = instr[11:7];
       rs1 = instr[19:15];
       imm = {{20{instr[31]}}, instr[31:20]};
       reg_write = 1;
+      decoder_illegal = 0;
     end
     7'b1100011: begin  //ALU B-Type
       rs1 = instr[19:15];
@@ -49,12 +54,14 @@ always @(*) begin //Anytime the input signal changes
       imm = { {20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0 }; //Add 1'b0 to shift right (2x's jump value)
       reg_write = 0;
       is_branch = 1;
+      decoder_illegal = 0;
     end
     7'b1101111: begin  //J-Type format : JAL
       rd = instr[11:7];
       imm = { {11{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0 };
       jal_jump = 1'b1;
       reg_write = 1;
+      decoder_illegal = 0;
     end
 
     7'b1100111: begin // I-Type format : JALR
@@ -63,18 +70,54 @@ always @(*) begin //Anytime the input signal changes
       imm = {{20{instr[31]}}, instr[31:20]};
       jalr_jump = 1'b1;
       reg_write = 1;
+      decoder_illegal = 0;
     end
-
     7'b0000011: begin // I-type : LOAD
-      is_load = 1'b0;
-
+      case(instr[14:12])
+        3'b000: begin//LOAD BYTE
+          is_load = 1'b1;
+          ram_address_load = rs1 + imm;
+          load_type = instr[14:12];
+          decoder_illegal = 0;
+        end
+        3'b001: begin//LOAD HALF
+          is_load = 1'b1;
+          ram_address_load = rs1 + imm;
+          load_type = instr[14:12];
+          decoder_illegal = 0;
+        end
+        3'b010: begin//LOAD WORD
+          is_load = 1'b1;
+          ram_address_load = rs1 + imm;
+          load_type = instr[14:12];
+          decoder_illegal = 0;
+        end
+        3'b100: begin//LOAD BYTE (U)
+          is_load = 1'b1;
+          ram_address_load = rs1 + imm;
+          load_type = instr[14:12];
+          decoder_illegal = 0;
+        end
+        3'b101: begin//LOAD HALF (U)
+          is_load = 1'b1;
+          ram_address_load = rs1 + imm;
+          load_type = instr[14:12];
+          decoder_illegal = 0;
+        end
+      endcase
     end
 
-    7'b0100011 begin //S-Type : STORE
-      is_store = 1'b0;
+    7'b0100011: begin //S-Type : STORE
+      is_store = 1'b1;
+      store_type = instr[14:12];
+      imm = {{20{instr[31]}}, instr[31:25], instr[11:7]};
+      rs1 = instr[19:15];
+      rs2 = instr[24:20];
+      decoder_illegal = 0;
     end
 
     default begin
+      store_type= 3'b0;
       is_load = 1'b0;
       is_store = 1'b0;
       reg_write = 1'b0;
@@ -84,7 +127,9 @@ always @(*) begin //Anytime the input signal changes
       rs1 = 4'bx;
       rs2 = 4'bx;
       imm = 31'bx;
-
+      is_load = 1'b0;
+      ram_address_load = 32'bx;
+      load_type = 3'bx;
       decoder_illegal = 1;
     end
   endcase
