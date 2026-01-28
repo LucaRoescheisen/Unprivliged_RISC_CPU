@@ -16,7 +16,10 @@ module decoder(
   output reg is_store,
   output reg [2:0] load_type,
   output reg [2:0] store_type,
-  output reg [31:0] ram_address_load
+  output reg [31:0] ram_address_load,
+  output reg[2:0] div_op,
+  output reg div_start,
+  output reg is_div_instruction
 );
 
   initial begin
@@ -32,7 +35,7 @@ always @(*) begin //Anytime the input signal changes
   jal_jump = 0;
   is_load = 0; ram_address_load = 0; load_type = 0;
   is_store = 0; decoder_illegal = 0;
-  store_type= 0;
+  store_type= 0; div_start = 0; is_div_instruction = 0;
   case(instr[6:0])     //Identify OP code
     7'b0110011: begin //ALU R-Type
       rd  = instr[11:7];
@@ -40,6 +43,11 @@ always @(*) begin //Anytime the input signal changes
       rs2 = instr[24:20];
       reg_write = 1;
       decoder_illegal = 0;
+      if(instr[31:25] == 7'b0000001) begin
+        div_start = 1'b1;
+        is_div_instruction = 1'b1;
+        reg_write = 1'b1;
+      end
     end
     7'b0010011: begin  //ALU I-Type
       rd  = instr[11:7];
@@ -119,6 +127,8 @@ always @(*) begin //Anytime the input signal changes
 
 
     default begin
+       div_start = 0;
+       is_div_instruction = 1'bx;
       store_type= 3'b0;
       is_load = 1'b0;
       is_store = 1'b0;
@@ -149,13 +159,13 @@ always @(*) begin //Anytime the input signal changes
         3'b100 :  begin
            case(instr[31:25])
              7'b0000000: alu_op = 5'b00010; //XOR
-             7'b0000001: div_op = 3'b001; // DIV
+             7'b0000001: div_op = 3'b100; // DIV
           endcase
         end
         3'b110 : begin
            case(instr[31:25])
              7'b0000000: alu_op = 5'b00011; //OR
-             7'b0000001: div_op = 3'b011; // REMAINDER
+             7'b0000001: div_op = 3'b110; // REMAINDER
           endcase
         end
 
@@ -163,7 +173,7 @@ always @(*) begin //Anytime the input signal changes
         3'b111 : begin
            case(instr[31:25])
              7'b0000000: alu_op = 5'b00100; //AND
-             7'b0000001: div_op = 3'b100; // REMAINDER (U)
+             7'b0000001: div_op = 3'b111; // REMAINDER (U)
           endcase
         end
         3'b001 : begin
@@ -176,7 +186,7 @@ always @(*) begin //Anytime the input signal changes
           case(instr[31:25])
             7'b0000000: alu_op = 5'b00110; //RIGHT SHIFT LOGICAL
             7'b0100000: alu_op = 5'b00111; //RIGHT SHIFT ARITHMETIC
-            7'b0000001: div_op = 3'b010; // DIV (U)
+            7'b0000001: div_op = 3'b101; // DIV (U)
           endcase
         end
         3'b010 : begin
@@ -191,20 +201,11 @@ always @(*) begin //Anytime the input signal changes
              7'b0000001: alu_op = 5'b10110; //MUL HIGH (U)
           endcase
         end
-
       endcase
+    end
 
       //M Extension
-
-
-    end
-  endcase
-
-
-    end
-
-
-    7'b0010011: begin //I-Type
+      7'b0010011: begin //I-Type
       case(instr[14:12])
         3'b000 : alu_op = 5'b01010;  //ADD IMMEDIATE
         3'b100 : alu_op = 5'b01011;  //XOR IMMEDIATE
@@ -226,16 +227,12 @@ always @(*) begin //Anytime the input signal changes
       b_type = instr[14:12];
     end
 
-
-
-
-
     default: begin
       alu_op = 5'bx;
       b_type = 3'bx;
+      div_op = 3'bx;
     end
   endcase
-
 
   case (instr[6:0])
     7'b0110011: alu_src = 0; // R-type
@@ -244,8 +241,6 @@ always @(*) begin //Anytime the input signal changes
     7'b0100011: alu_src = 1; // STORE
     7'b1100011: alu_src = 0;// B-TYPE
   endcase
-end
 
-
-
+  end
 endmodule

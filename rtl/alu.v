@@ -32,7 +32,7 @@ always @(*) begin //Process OPCODES
   5'b10000 : result = $signed(a) >>> b[4:0];               // SRAI (arithmetic)
   5'b10001 : result = ($signed(a) < $signed(b)) ? 32'd1 : 32'd0; // SLTI
   5'b10010 : result = (a < b) ? 32'd1 : 32'd0;    // SLTIU
-
+  //M Extension
   5'b10011 : result = full_product_s_s[31:0];     //MUL
   5'b10100 : result = full_product_s_s[63:32];    //MULH
   5'b10101 : result = full_product_s_u[63:32];    //MULSU

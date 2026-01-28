@@ -35,18 +35,24 @@ module top(
   //FSM CONTROLS
   wire [2:0] state; //FSM current state
   wire mem_busy;
-  wire div_busy;
   wire is_load_store;
   wire decoder_illegal;
+  localparam FETCH      = 3'b000,
+             DECODE     = 3'b001,
+             EXECUTE    = 3'b010,
+             WRITE_BACK = 3'b011, //when saved to regfile
+             MEM_WAIT   = 3'b100,
+             TRAP       = 3'b101;
 
 
-localparam FETCH      = 3'b000,
-           DECODE     = 3'b001,
-           EXECUTE    = 3'b010,
-           WRITE_BACK = 3'b011, //when saved to regfile
-           MEM_WAIT   = 3'b100,
-           TRAP       = 3'b101;
 
+  //Divider Controls
+  wire [2:0] div_op;
+  wire div_start;
+  wire div_busy;
+  wire is_div_instruction;
+  wire [31:0] div_result;
+  wire[31:0] result_mux = (is_div_instruction) ? div_result : reg_write_data; // If Division take division result
 
   initial begin
     $readmemh("D:/u_risc/programs/test.hex", instr);
@@ -104,7 +110,7 @@ localparam FETCH      = 3'b000,
     .rs1(rs1),
     .rs2(rs2),
     .rd(rd),
-    .result(reg_write_data),
+    .result(result_mux),
     .reg_write(reg_write),
     .state(state),
     .rs1_val(rs1_val),
@@ -131,7 +137,10 @@ localparam FETCH      = 3'b000,
     .is_load(is_load),
     .is_store(is_store),
     .load_type(load_type),
-    .store_type(store_type)
+    .store_type(store_type),
+    .div_op(div_op),
+    .div_start(div_start),
+    .is_div_instruction(is_div_instruction)
   );
 
 
@@ -143,6 +152,17 @@ localparam FETCH      = 3'b000,
     .alu_op(alu_op),
     .result(alu_result)
   );
+
+  divider divider_module(
+    .clk(clk),
+    .divisor(rs1_val),
+    .dividend(rs2_val),
+    .start(div_start),
+    .div_op(div_op),
+    .result(div_result),
+    .busy(div_busy)
+  );
+
 
   (* dont_touch = "true" *)
   branch_unit branch_unit_module(
@@ -160,9 +180,10 @@ localparam FETCH      = 3'b000,
     .clk(clk),
     .reset(reset),
     .decoder_illegal(decoder_illegal),
-    .div_busy(div_busy),
     .mem_busy(mem_busy),
     .is_load_store(is_load_store),
+    .div_start(div_start),
+    .div_busy(div_busy),
     .state(state)
   );
 
