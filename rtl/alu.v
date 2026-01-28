@@ -5,6 +5,9 @@ module alu(
 
   output reg [31:0] result
 );
+  wire [63:0] full_product_s_s = $signed(a) * $signed(b);
+  wire [63:0] full_product_s_u = $signed(a) * b;
+  wire [63:0] full_product_u_u = a * b;
 
 always @(*) begin //Process OPCODES
   case(alu_op)
@@ -26,9 +29,14 @@ always @(*) begin //Process OPCODES
   5'b01101 : result = a & b;                       // ANDI
   5'b01110 : result = a << b[4:0];                // SLLI
   5'b01111 : result = a >> b[4:0];                // SRLI (logical)
-  5'b10000 : result = a >>> b[4:0];               // SRAI (arithmetic)
+  5'b10000 : result = $signed(a) >>> b[4:0];               // SRAI (arithmetic)
   5'b10001 : result = ($signed(a) < $signed(b)) ? 32'd1 : 32'd0; // SLTI
   5'b10010 : result = (a < b) ? 32'd1 : 32'd0;    // SLTIU
+
+  5'b10011 : result = full_product_s_s[31:0];     //MUL
+  5'b10100 : result = full_product_s_s[63:32];    //MULH
+  5'b10101 : result = full_product_s_u[63:32];    //MULSU
+  5'b10110 : result = full_product_u_u[63:32];    //MULU
 
     default:
     result = 32'bx;

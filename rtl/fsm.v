@@ -15,7 +15,8 @@ localparam FETCH      = 3'b000,
            EXECUTE    = 3'b010,
            WRITE_BACK = 3'b011, //when saved to regfile
            MEM_WAIT   = 3'b100,
-           TRAP       = 3'b101;
+           TRAP       = 3'b101,
+           DIV_WAIT   = 3'b110;
 
 always @(posedge clk) begin
   if(reset) state <= FETCH;

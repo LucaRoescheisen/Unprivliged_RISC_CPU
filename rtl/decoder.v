@@ -116,6 +116,8 @@ always @(*) begin //Anytime the input signal changes
       decoder_illegal = 0;
     end
 
+
+
     default begin
       store_type= 3'b0;
       is_load = 1'b0;
@@ -141,21 +143,64 @@ always @(*) begin //Anytime the input signal changes
           case(instr[31:25])
             7'b0000000: alu_op = 5'b00000; //ADD
             7'b0100000: alu_op = 5'b00001; //SUB
+            7'b0000001: alu_op = 5'b10011;  //MUL
           endcase
         end
-        3'b100 : alu_op = 5'b00010; //XOR
-        3'b110 : alu_op = 5'b00011; //OR
-        3'b111 : alu_op = 5'b00100; //AND
-        3'b001 : alu_op = 5'b00101; //LEFT SHIFT LOGICAL
+        3'b100 :  begin
+           case(instr[31:25])
+             7'b0000000: alu_op = 5'b00010; //XOR
+             7'b0000001: div_op = 3'b001; // DIV
+          endcase
+        end
+        3'b110 : begin
+           case(instr[31:25])
+             7'b0000000: alu_op = 5'b00011; //OR
+             7'b0000001: div_op = 3'b011; // REMAINDER
+          endcase
+        end
+
+
+        3'b111 : begin
+           case(instr[31:25])
+             7'b0000000: alu_op = 5'b00100; //AND
+             7'b0000001: div_op = 3'b100; // REMAINDER (U)
+          endcase
+        end
+        3'b001 : begin
+          case(instr[31:25])
+            7'b0000000: alu_op = 5'b00101; //LEFT SHIFT LOGICAL
+            7'b0000001: alu_op = 5'b10100; //MUL HIGH
+          endcase
+        end
         3'b101: begin
           case(instr[31:25])
             7'b0000000: alu_op = 5'b00110; //RIGHT SHIFT LOGICAL
             7'b0100000: alu_op = 5'b00111; //RIGHT SHIFT ARITHMETIC
+            7'b0000001: div_op = 3'b010; // DIV (U)
           endcase
         end
-        3'b010 : alu_op = 5'b01000;  //LESS THAN
-        3'b011 : alu_op = 5'b01001;  //GREATER THAN
+        3'b010 : begin
+           case(instr[31:25])
+             7'b0000000: alu_op = 5'b01000;  //LESS THAN
+             7'b0000001: alu_op = 5'b10101; //MUL HIGH (S) (U)
+          endcase
+        end
+        3'b011 : begin
+           case(instr[31:25])
+             7'b0000000: alu_op = 5'b01001;  //LESS THAN (U)
+             7'b0000001: alu_op = 5'b10110; //MUL HIGH (U)
+          endcase
+        end
+
       endcase
+
+      //M Extension
+
+
+    end
+  endcase
+
+
     end
 
 
@@ -172,14 +217,16 @@ always @(*) begin //Anytime the input signal changes
             7'b0100000 : alu_op = 5'b10000; //SHIFT RIGHT ARITHMETIC IMMEDIATE
           endcase
         end
-        3'b010 : alu_op = 5'b10001;
-        3'b011 : alu_op = 5'b10010;
+        3'b010 : alu_op = 5'b10001; // LESS THAN IMMEDIATE
+        3'b011 : alu_op = 5'b10010; // LESS THAN IMMEDIATE UNSIGNED
         endcase
     end
 
     7'b1100011: begin //B-Type
       b_type = instr[14:12];
     end
+
+
 
 
 
