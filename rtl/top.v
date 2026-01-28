@@ -8,7 +8,8 @@ module top(
   wire [31:0] current_instr;
   reg [31:0] IR;
 
-  wire [3:0] rs1, rs2, rd;
+  wire [3:0] rs1, rs2;
+  wire [4:0] rd;
   wire [31:0] rs1_val, rs2_val;
   wire[31:0] imm;
   wire[31:0] alu_result;
@@ -18,7 +19,7 @@ module top(
   wire [4:0] alu_op;
   wire take_branch;
   wire is_branch;
-
+  wire is_lui;
   //PC Handling
   wire [31:0] pc_4 = pc +4;
   wire [31:0] pc_imm = pc + imm;
@@ -51,8 +52,11 @@ module top(
   wire div_start;
   wire div_busy;
   wire is_div_instruction;
+  wire divider_trigger = (state == EXECUTE) && is_div_instruction;
+
   wire [31:0] div_result;
-  wire[31:0] result_mux = (is_div_instruction) ? div_result : reg_write_data; // If Division take division result
+  wire[31:0] result_mux = (is_div_instruction) ? div_result :
+                          (is_lui) ? imm : reg_write_data; // If Division take division result
 
   initial begin
     $readmemh("D:/u_risc/programs/test.hex", instr);
@@ -89,6 +93,8 @@ module top(
   wire [31:0] ram_address_load;
   assign ram_address_store = rs1_val + imm;
   assign ram_data_in = rs2_val;
+
+
   (* dont_touch = "true" *)
   data_memory data_memory_module(
     .clk(clk),
@@ -117,6 +123,7 @@ module top(
     .rs2_val(rs2_val)
   );
 
+
   wire alu_src;
   wire [2:0] b_type;
   (* dont_touch = "true" *)
@@ -140,7 +147,8 @@ module top(
     .store_type(store_type),
     .div_op(div_op),
     .div_start(div_start),
-    .is_div_instruction(is_div_instruction)
+    .is_div_instruction(is_div_instruction),
+    .is_lui(is_lui)
   );
 
 
@@ -153,11 +161,12 @@ module top(
     .result(alu_result)
   );
 
+
   divider divider_module(
     .clk(clk),
     .divisor(rs1_val),
     .dividend(rs2_val),
-    .start(div_start),
+    .start(divider_trigger),
     .div_op(div_op),
     .result(div_result),
     .busy(div_busy)
@@ -174,7 +183,6 @@ module top(
   );
 
 
-
   (* dont_touch = "true" *)
   fsm fsm_module(
     .clk(clk),
@@ -182,7 +190,7 @@ module top(
     .decoder_illegal(decoder_illegal),
     .mem_busy(mem_busy),
     .is_load_store(is_load_store),
-    .div_start(div_start),
+    .is_div_instruction(is_div_instruction),
     .div_busy(div_busy),
     .state(state)
   );

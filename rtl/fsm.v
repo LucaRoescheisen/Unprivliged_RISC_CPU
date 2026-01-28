@@ -4,7 +4,7 @@ module fsm(
   input decoder_illegal,
   input mem_busy,
   input is_load_store,
-  input div_start,
+  input is_div_instruction,
   input div_busy,
   output reg [2:0] state
 );
@@ -31,7 +31,7 @@ always @(*) begin
     FETCH      : next_state = DECODE;
     DECODE     : next_state = decoder_illegal ? TRAP : EXECUTE ;
     EXECUTE    : begin
-                  if(div_start) next_state = DIV_WAIT;
+                  if(is_div_instruction) next_state = DIV_WAIT;
                   else if(is_load_store) next_state = MEM_WAIT; //Generated on lw or sw
                   else next_state = WRITE_BACK;
                  end

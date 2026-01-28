@@ -2,7 +2,7 @@ module regfile(
   input clk,
   input[3:0] rs1,
   input[3:0] rs2,
-  input[3:0] rd,
+  input[4:0] rd,
   input[31:0] result,
   input reg_write,
   input [2:0] state,

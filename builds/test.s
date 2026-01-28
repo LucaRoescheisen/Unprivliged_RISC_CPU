@@ -1,23 +1,30 @@
-# --- TEST 1: Store/Load Word (32-bit) ---
-addi x5, x0, 123       # x5 = 123 (Data to store)
-addi x10, x0, 100      # x10 = 100 (The RAM Address)
-sw x5, 0(x10)          # RAM[100] = 123
+# RISC-V Math Test
+# Final results will be stored in registers x10 through x20
 
-addi x5, x0, 0         # Clear x5 (So we know the load actually works)
-lw x6, 0(x10)          # x6 = RAM[100]. Should be 123.
+.text
+.globl _start
 
-# --- TEST 2: Store/Load Byte (8-bit) ---
-addi x7, x0, 0xFF      # x7 = 255 (0x000000FF)
-sb x7, 4(x10)          # RAM[104] = 0xFF (Store only the byte)
+_start:
 
-lb x8, 4(x10)          # x8 = RAM[104]. Should be -1 (due to sign extension).
-lbu x9, 4(x10)         # x9 = RAM[104]. Should be 255 (zero extension).
 
-# --- TEST 3: Offset Check ---
-addi x11, x0, 50       # x11 = 50
-sw x7, 10(x11)         # Store x7 at address 60 (50 + 10)
-lw x12, 60(x0)         # Load from address 60. x12 should be 0xFF.
+    # --- TEST UNSIGNED DIVISION ---
+    # 0xFFFFFFFF is -1 as signed, but 4,294,967,295 as unsigned
+    li   x5, -1
+    li   x6, 2
+    divu x14, x5, x6   # x14 = (2^32 - 1) / 2 = 2,147,483,647 (0x7FFFFFFF)
 
-# --- END ---
-end:
-jal x0, end            # Infinite loop
+    # --- TEST MULTIPLICATION (MUL / MULH) ---
+    li x7, 2000
+    li x8, 3000
+    mul x15, x7, x8    # x15 = 6,000,000
+
+    # Test MULH (Upper 32 bits)
+    # 0x7FFFFFFF * 2 = 0x00000001 FFFFFFFE
+    li x7, 0x7FFFFFFF
+    li x8, 2
+    mul  x16, x7, x8   # x16 = 0xFFFFFFFE (Lower bits)
+    mulh x17, x7, x8   # x17 = 0x00000001 (Upper bits)
+
+    # --- END TEST ---
+    # In a real simulation, we might loop here
+    ebreak             # Signal to debugger/simulator to stop

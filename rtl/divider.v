@@ -8,6 +8,10 @@ module divider(
   output reg busy
 );
 
+initial begin
+  busy = 0;
+end
+
 reg [31:0] quotient;
 reg [31:0] remainder;
 
@@ -34,8 +38,9 @@ wire [32:0] sub_trial = shifted_space[63:32] - useable_divisor; // Uses 33 bits 
 
 always @(*) begin
   case (div_op)
-    3'b001, 3'b010: result = quotient;
-    3'b011, 3'b100: result = remainder;
+    3'b101, 3'b100: result = quotient;
+    3'b110, 3'b111: result = remainder;
+    default:        result = 32'b0;
   endcase
 end
 
@@ -58,18 +63,16 @@ always @(posedge clk) begin
       remainder_neg <= dividend[31];
     end
   end else begin
+    if(counter == 30) begin
+      busy = 0;
+    end else begin
+      counter <= counter + 1;
       if(sub_trial[32]) begin
         dividing_space <= {shifted_space[63:1], 1'b0}; //Since < 0 we restore the whole space but add a 0 at bit 0
       end
       else begin
         dividing_space[63:0] <= {sub_trial[31:0], shifted_space[31:1], 1'b1}; //Update the Remainder, and add a 1 to bit 0
       end
-
-
-    if(counter == 31) begin
-      busy = 0;
-    end else begin
-      counter <= counter + 1;
     end
   end
 end
