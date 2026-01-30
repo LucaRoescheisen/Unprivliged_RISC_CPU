@@ -2,198 +2,286 @@ module top(
   input clk,
   input reset
 );
-  (* dont_touch = "true" *) reg [31:0] pc = 0; //Program counter (Holds address of current instruction)
+  //Hazards
+  wire stall;
+  wire flush;
+  //IFID Pipline Registers
+  reg [31:0] IF_ID_instr;
+  reg [31:0] IF_ID_pc_plus_4;
+  reg [31:0] IF_ID_pc;
 
-  reg [31:0] instr [0:17];
-  wire [31:0] current_instr;
-  reg [31:0] IR;
-
-  wire [3:0] rs1, rs2;
-  wire [4:0] rd;
-  wire [31:0] rs1_val, rs2_val;
-  wire[31:0] imm;
-  wire[31:0] alu_result;
-  reg[31:0] alu_output_reg;
-  wire reg_write;
-  wire [31:0] pc_jump;
-  wire [4:0] alu_op;
-  wire take_branch;
-  wire is_branch;
-  wire is_lui;
-  //PC Handling
-  wire [31:0] pc_4 = pc +4;
-  wire [31:0] pc_imm = pc + imm;
-  wire [31:0] jalr_target = (rs1_val + imm) & ~1;// Forces bit alignment by settings 1's to 0
-  wire jal_jump;
-  wire jalr_jump;
-  wire [31:0] pc_branch = take_branch ? (pc_imm) : pc_4;
-  wire [31:0] pc_next = (jalr_jump) ? jalr_target : (jal_jump || take_branch) ? pc_imm : pc_4;
-
-  //Result Handling
-  wire [31:0] reg_write_data;
-  assign reg_write_data = (jal_jump || jalr_jump) ? (pc + 4) : alu_output_reg; //OR alu_result
-
-  //FSM CONTROLS
-  wire [2:0] state; //FSM current state
-  wire mem_busy;
-  wire is_load_store;
-  wire decoder_illegal;
-  localparam FETCH      = 3'b000,
-             DECODE     = 3'b001,
-             EXECUTE    = 3'b010,
-             WRITE_BACK = 3'b011, //when saved to regfile
-             MEM_WAIT   = 3'b100,
-             TRAP       = 3'b101;
+  //Fetch Wires
+  wire [31:0] IF_ID_instr_wire;
+  wire pc_src;           //Branches
+  wire [31:0] pc_target; //Jump target
+  wire [31:0] pc_out_wire;    //Next PC value
+  wire [31:0] IF_ID_wire;    //Current PC value
 
 
-
-  //Divider Controls
-  wire [2:0] div_op;
-  wire div_start;
-  wire div_busy;
-  wire is_div_instruction;
-  wire divider_trigger = (state == EXECUTE) && is_div_instruction;
-
-  wire [31:0] div_result;
-  wire[31:0] result_mux = (is_div_instruction) ? div_result :
-                          (is_lui) ? imm : reg_write_data; // If Division take division result
-
-  initial begin
-    $readmemh("D:/u_risc/programs/test.hex", instr);
-  end
-
-
-  assign current_instr = instr[pc >> 2];  //Fetch current instruction
-  always @(posedge clk) begin
-    if(state ==FETCH) begin
-      IR <= current_instr;
-    end
-  end
-
-  always @(posedge clk) begin //Update PC
-    if(state == WRITE_BACK)
-      pc <= pc_next;//Increment program counter, by 4 bytes ass each instruction is 32-bit
-  end
-
-  always @(posedge clk) begin
-    if (state == EXECUTE) begin
-      alu_output_reg <= alu_result;
-    end
-  end
-  wire is_load, is_store;
-  wire mem_read_en = (state ==EXECUTE || state == MEM_WAIT) && is_load;
-  wire mem_write_en = (state ==EXECUTE || state == MEM_WAIT) && is_store;
-  assign is_load_store = mem_read_en || mem_write_en;
-
-  wire [31:0] ram_address_store;
-  wire [31:0] ram_data_in;
-  wire [31:0] ram_data_out;
-  wire [2:0 ] load_type;
-  wire [2:0 ] store_type;
-  wire [31:0] ram_address_load;
-  assign ram_address_store = rs1_val + imm;
-  assign ram_data_in = rs2_val;
-
-
-  (* dont_touch = "true" *)
-  data_memory data_memory_module(
-    .clk(clk),
-    .load_type(load_type),
-    .store_type(store_type),
-    .mem_read_en(mem_read_en),
-    .mem_write_en(mem_write_en),
-    .ram_address_store(ram_address_store),
-    .ram_address_load(ram_address_load),
-    .data_in(ram_data_in),
-    .data_out(ram_data_out),
-    .mem_busy(mem_busy)
-  );
-
-
-  (* dont_touch = "true" *)
-  regfile reg_file_module(
-    .clk(clk),
-    .rs1(rs1),
-    .rs2(rs2),
-    .rd(rd),
-    .result(result_mux),
-    .reg_write(reg_write),
-    .state(state),
-    .rs1_val(rs1_val),
-    .rs2_val(rs2_val)
-  );
-
-
-  wire alu_src;
-  wire [2:0] b_type;
-  (* dont_touch = "true" *)
-  decoder decoder_module(
-    .instr(IR),
-    .rd(rd),
-    .rs1(rs1),
-    .rs2(rs2),
-    .imm(imm),
-    .alu_op(alu_op),
-    .reg_write(reg_write),
-    .alu_src(alu_src),
-    .b_type(b_type),
-    .is_branch(is_branch),
-    .jal_jump(jal_jump),
-    .jalr_jump(jalr_jump),
-    .decoder_illegal(decoder_illegal),
-    .is_load(is_load),
-    .is_store(is_store),
-    .load_type(load_type),
-    .store_type(store_type),
-    .div_op(div_op),
-    .div_start(div_start),
-    .is_div_instruction(is_div_instruction),
-    .is_lui(is_lui)
-  );
-
-
-  wire [31:0] alu_b = alu_src ? imm : rs2_val;
-  (* dont_touch = "true" *)
-  alu alu_module(
-    .a(rs1_val),
-    .b(alu_b),
-    .alu_op(alu_op),
-    .result(alu_result)
-  );
-
-
-  divider divider_module(
-    .clk(clk),
-    .divisor(rs1_val),
-    .dividend(rs2_val),
-    .start(divider_trigger),
-    .div_op(div_op),
-    .result(div_result),
-    .busy(div_busy)
-  );
-
-
-  (* dont_touch = "true" *)
-  branch_unit branch_unit_module(
-    .is_branch(is_branch),
-    .b_type(b_type),
-    .rs1_val(rs1_val),
-    .rs2_val(rs2_val),
-    .take_branch(take_branch)
-  );
-
-
-  (* dont_touch = "true" *)
-  fsm fsm_module(
+  //**     Fetch Stage     **//
+  fetch_stage fetch_stage_mod(
     .clk(clk),
     .reset(reset),
-    .decoder_illegal(decoder_illegal),
-    .mem_busy(mem_busy),
-    .is_load_store(is_load_store),
-    .is_div_instruction(is_div_instruction),
-    .div_busy(div_busy),
-    .state(state)
+    .stall(stall),
+    .pc_src(pc_src),
+    .if_instruction(IF_ID_instr_wire),
+    .pc_target(pc_target),
+    .pc_out(pc_out_wire),
+    .pc(IF_ID_wire)
   );
+
+  always @(posedge clk) begin //Handle flush and stalling
+    if(flush || reset) begin
+      IF_ID_instr <= 32'b0;
+      IF_ID_pc_plus_4 <= 32'b0;
+    end else begin
+      if(stall) begin
+        IF_ID_instr <= IF_ID_instr;
+        IF_ID_pc_plus_4 <= IF_ID_pc_plus_4;
+        IF_ID_pc <= IF_ID_pc;
+      end else begin
+        IF_ID_instr <= IF_ID_instr_wire;
+        IF_ID_pc_plus_4 <= pc_out_wire;
+        IF_ID_pc <= IF_ID_wire;
+      end
+    end
+  end
+  //**-----------------------**//
+
+
+  //Decode Registers
+  //Writeback
+  reg [4:0]  mem_wb_rd_reg;
+  reg [31:0]  mem_wb_result_reg;
+  reg        mem_wb_write_reg;
+  reg [31:0] mem_data_out_reg;
+  reg        mem_wb_is_load_reg;
+  //ID-EX Registers
+  reg [4:0]  id_rs1_addr_reg;
+  reg [4:0]  id_rs2_addr_reg;
+
+  reg [31:0] id_ex_pc_reg_plus_4_reg;
+  reg [31:0] id_ex_pc_reg;
+  reg [31:0] id_ex_rs1_val_reg;
+  reg [31:0] id_ex_rs2_val_reg;
+  reg        id_ex_reg_write_reg;
+  reg [31:0] id_ex_imm_val_reg;
+  reg [4:0]  id_ex_alu_op_reg;
+  reg [3:0]  id_ex_div_op_reg;
+  reg [4:0]  id_ex_rd_addr_reg;
+  reg        id_ex_alu_src_reg;
+  reg [2:0]  id_ex_branch_type_reg;
+  reg        id_ex_is_branch_reg;
+  reg        id_ex_jal_jump_reg;
+  reg        id_ex_jalr_jump_reg;
+  reg        id_ex_decoder_illegal_reg;
+  reg        id_ex_is_load_reg;
+  reg        id_ex_is_store_reg;
+  reg [2:0]  id_ex_load_type_reg;
+  reg [2:0]  id_ex_store_type_reg;
+  reg        id_ex_div_start_reg;
+  reg        id_ex_div_instruction_reg;
+  reg        id_ex_is_lui_reg;
+  //ID-EX Wires
+  wire [4:0]  id_rs1_addr_w;
+  wire [4:0]  id_rs2_addr_w;
+  wire [31:0] id_rs1_val_w;
+  wire [31:0] id_rs2_val_w;
+  wire        id_reg_write_w;
+  wire [31:0] id_imm_val_w;
+  wire [3:0]  id_alu_op_w;
+  wire [3:0]  id_div_op_w;
+  wire [4:0]  id_rd_addr_w;
+  wire        id_alu_src_w;
+  wire [2:0]  id_branch_type_w;
+  wire        id_is_branch_w;
+  wire        id_jal_jump_w;
+  wire        id_jalr_jump_w;
+  wire        id_decoder_illegal_w;
+  wire        id_is_load_w;
+  wire        id_is_store_w;
+  wire [2:0]  id_load_type_w;
+  wire [2:0]  id_store_type_w;
+  wire        id_div_start_w;
+  wire        id_div_instruction_w;
+  wire        id_is_lui_w;
+
+  //**     Decode Stage     **//
+  decode_stage decode_stage_mod(
+    .clk(clk),
+    .IF_ID_instr(IF_ID_instr),
+    .IF_ID_pc(IF_ID_pc_plus_4),
+    .mem_wb_result(mem_data_out_reg),
+    .wb_rd(mem_wb_rd_reg),
+    .wb_result(mem_wb_result_reg),
+    .wb_reg_write(mem_wb_write_reg),
+    .wb_is_load_reg(mem_wb_is_load_reg),
+    .id_rs1_val(id_rs1_val_w),
+    .id_rs2_val(id_rs2_val_w),
+    .id_reg_write_reg(id_reg_write_w),
+    .id_imm_val(id_imm_val_w),
+    .id_alu_op(id_alu_op_w),
+    .id_div_op(id_div_op_w),
+    .id_rd_addr(id_rd_addr_w),
+    .id_rs1_addr(id_rs1_addr_w),
+    .id_rs2_addr(id_rs2_addr_w),
+    .id_alu_src(id_alu_src_w),
+    .id_branch_type(id_branch_type_w),
+    .id_is_branch(id_is_branch_w),
+    .id_jal_jump(id_jal_jump_w),
+    .id_jalr_jump(id_jalr_jump_w),
+    .id_decoder_illegal(id_decoder_illegal_w),
+    .id_is_load(id_is_load_w),
+    .id_is_store(id_is_store_w),
+    .id_load_type(id_load_type_w),
+    .id_store_type(id_store_type_w),
+    .id_div_start(id_div_start_w),
+    .id_div_instruction(id_div_instruction_w),
+    .id_is_lui(id_is_lui_w)
+  );
+
+  always @(posedge clk) begin
+    if(reset || flush) begin
+      id_ex_reg_write_reg <= 0;
+      id_ex_is_load_reg <= 0;
+      id_ex_is_store_reg <= 0;
+      id_ex_is_branch_reg <= 0;
+      id_ex_div_start_reg<= 0;
+      id_ex_jal_jump_reg  <= 0;
+      id_ex_jalr_jump_reg <= 0;
+      id_ex_div_instruction_reg <= 0;
+    end
+    else if(!stall) begin
+      id_ex_pc_reg_plus_4_reg <= IF_ID_pc_plus_4;
+      id_ex_pc_reg <= IF_ID_pc;
+      id_ex_rs1_val_reg <=id_rs1_val_w;
+      id_ex_rs2_val_reg <= id_rs2_val_w;
+      id_ex_reg_write_reg <= id_reg_write_w;
+      id_ex_imm_val_reg <= id_imm_val_w;
+      id_ex_alu_op_reg <= id_alu_op_w;
+      id_ex_div_op_reg <= id_div_op_w;
+      id_ex_rd_addr_reg <= id_rd_addr_w;
+      id_ex_alu_src_reg <= id_alu_src_w;
+      id_ex_branch_type_reg <= id_branch_type_w;
+      id_ex_is_branch_reg <= id_is_branch_w;
+      id_ex_jal_jump_reg <= id_jal_jump_w;
+      id_ex_jalr_jump_reg <= id_jalr_jump_w;
+      id_ex_decoder_illegal_reg <= id_decoder_illegal_w;
+      id_ex_is_load_reg <= id_is_load_w;
+      id_ex_is_store_reg <= id_is_store_w;
+      id_ex_load_type_reg <= id_load_type_w;
+      id_ex_store_type_reg <= id_store_type_w;
+      id_ex_div_start_reg <= id_div_start_w;
+      id_ex_div_instruction_reg <= id_div_instruction_w;
+      id_ex_is_lui_reg <= id_is_lui_w;
+      id_rs1_addr_reg <=id_rs1_addr_w;
+      id_rs2_addr_reg <=id_rs2_addr_w;
+    end
+
+  end
+   //**-----------------------**//
+
+
+  //Execute Registers
+  //Writeback
+
+  //EX-MEM Registers
+  reg [31:0] ex_mem_result_reg;
+  reg [4:0] ex_mem_rd_addr_reg;
+  reg ex_mem_reg_write_reg;
+  reg ex_mem_is_load_reg;
+  reg ex_mem_is_store_reg;
+  reg [2:0] ex_mem_load_type_reg;
+  reg [2:0] ex_mem_store_type_reg;
+  reg [31:0] ex_mem_rs2_val_reg;
+
+
+  //EX-MEM Wires
+  wire [31:0] id_ex_result_w;
+  wire [31:0] ex_id_pc_target_w;
+  wire div_busy_w;
+ //**     Execute Stage     **//
+  execute_stage execute_stage_module(
+    .clk(clk),
+    .id_pc_reg(id_ex_pc_reg),              // Matches your reg name
+    .id_pc_4_reg(id_ex_pc_reg_plus_4_reg),     // Matches your reg name
+    .id_rs1_val_reg(id_ex_rs1_val_reg),
+    .id_rs2_val_reg(id_ex_rs2_val_reg),
+    .id_imm_val_reg(id_ex_imm_val_reg),
+    .id_alu_src_reg(id_ex_alu_src_reg),
+    .id_is_branch_reg(id_ex_is_branch_reg),
+    .id_branch_type_reg(id_ex_branch_type_reg),
+    .id_jal_jump_reg(id_ex_jal_jump_reg),
+    .id_jalr_jump_reg(id_ex_jalr_jump_reg),
+    .id_alu_op_reg(id_ex_alu_op_reg),
+    .id_div_op_reg(id_ex_div_op_reg),
+    .id_div_instruction(id_ex_div_instruction_reg),
+    .ex_result(id_ex_result_w),
+    .ex_jump_branch_taken(flush),
+    .ex_pc_target(pc_target),      // Feed this back to fetch!
+    .divider_busy(div_busy_w)
+);
+assign pc_src = flush;
+
+ always @(posedge clk) begin
+    if(reset) begin
+        ex_mem_reg_write_reg <= 0;
+        ex_mem_is_store_reg  <= 0;
+        ex_mem_is_load_reg   <= 0;
+    end
+    else if(!stall) begin
+      ex_mem_result_reg <= id_ex_result_w;
+      ex_mem_rd_addr_reg  <= id_ex_rd_addr_reg; // Pass the destination forward
+      ex_mem_reg_write_reg <= id_ex_reg_write_reg;
+      ex_mem_is_store_reg  <= id_ex_is_store_reg;
+      ex_mem_is_load_reg   <= id_ex_is_load_reg;
+      ex_mem_load_type_reg <= id_ex_load_type_reg;
+      ex_mem_store_type_reg <= id_ex_store_type_reg;
+      ex_mem_rs2_val_reg <=  id_ex_rs2_val_reg;
+    end
+
+ end
+
+    //**-----------------------**//
+
+  wire mem_busy_w;
+  wire [31:0] mem_data_out_w;
+
+
+   //**     Memory Stage/Writeback     **//
+  data_memory ram_unit (
+    .clk(clk),
+    .load_type(ex_mem_load_type_reg),
+    .store_type(ex_mem_store_type_reg),
+    .mem_read_en(ex_mem_is_load_reg),
+    .mem_write_en(ex_mem_is_store_reg),
+    .ram_address_store(ex_mem_result_reg),
+    .ram_address_load(ex_mem_result_reg),
+    .data_in(ex_mem_rs2_val_reg),
+    .data_out(mem_data_out_w),
+    .mem_busy(mem_busy_w)
+);
+
+assign stall = div_busy_w; //SETS STALL
+
+ always @(posedge clk) begin
+    if(reset) begin
+        mem_wb_write_reg <= 0;
+        mem_wb_is_load_reg <= 0;
+        mem_wb_result_reg <= 0;
+    end
+    else if(!stall) begin
+      mem_wb_result_reg <= ex_mem_result_reg;
+      mem_wb_rd_reg <= ex_mem_rd_addr_reg;
+      mem_wb_write_reg <= ex_mem_reg_write_reg;
+      mem_data_out_reg <= mem_data_out_w;
+      mem_wb_is_load_reg <= ex_mem_is_load_reg;
+    end
+
+ end
+
+
+  //**-----------------------**//
 
 
 endmodule

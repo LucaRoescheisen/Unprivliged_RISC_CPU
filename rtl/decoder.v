@@ -1,8 +1,8 @@
 module decoder(
   input [31:0] instr,
   output reg [4:0] rd,
-  output reg [3:0] rs1,
-  output reg [3:0] rs2,
+  output reg [4:0] rs1,
+  output reg [4:0] rs2,
   output reg [31:0] imm,
   output reg [4:0] alu_op,
   output reg reg_write,
@@ -16,7 +16,6 @@ module decoder(
   output reg is_store,
   output reg [2:0] load_type,
   output reg [2:0] store_type,
-  output reg [31:0] ram_address_load,
   output reg[2:0] div_op,
   output reg div_start,
   output reg is_div_instruction,
@@ -34,7 +33,7 @@ always @(*) begin //Anytime the input signal changes
   alu_op = 0; reg_write = 0; is_branch = 0;
   alu_src = 0; b_type = 0; jalr_jump = 0;
   jal_jump = 0;
-  is_load = 0; ram_address_load = 0; load_type = 0;
+  is_load = 0;load_type = 0;
   is_store = 0; decoder_illegal = 0;
   store_type= 0; div_start = 0; is_div_instruction = 0;
   is_lui = 0;
@@ -90,31 +89,26 @@ always @(*) begin //Anytime the input signal changes
       case(instr[14:12])
         3'b000: begin//LOAD BYTE
           is_load = 1'b1;
-          ram_address_load = rs1 + imm;
           load_type = instr[14:12];
           decoder_illegal = 0;
         end
         3'b001: begin//LOAD HALF
           is_load = 1'b1;
-          ram_address_load = rs1 + imm;
           load_type = instr[14:12];
           decoder_illegal = 0;
         end
         3'b010: begin//LOAD WORD
           is_load = 1'b1;
-          ram_address_load = rs1 + imm;
           load_type = instr[14:12];
           decoder_illegal = 0;
         end
         3'b100: begin//LOAD BYTE (U)
           is_load = 1'b1;
-          ram_address_load = rs1 + imm;
           load_type = instr[14:12];
           decoder_illegal = 0;
         end
         3'b101: begin//LOAD HALF (U)
           is_load = 1'b1;
-          ram_address_load = rs1 + imm;
           load_type = instr[14:12];
           decoder_illegal = 0;
         end
@@ -141,11 +135,10 @@ always @(*) begin //Anytime the input signal changes
       is_branch = 1'b0;
       jal_jump  = 1'b0;
       jalr_jump = 1'b0;
-      rs1 = 4'bx;
-      rs2 = 4'bx;
+      rs1 = 5'bx;
+      rs2 = 5'bx;
       imm = 31'bx;
       is_load = 1'b0;
-      ram_address_load = 32'bx;
       load_type = 3'bx;
       decoder_illegal = 1;
     end

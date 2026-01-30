@@ -1,30 +1,23 @@
-# RISC-V Math Test
-# Final results will be stored in registers x10 through x20
+# RISC-V Base Integer Test
+# No branches, no complex math
 
-.text
-.globl _start
+# 1. Test ADDI (Immediate math)
+addi x1, x0, 10      # x1 = 10
+addi x2, x0, 20      # x2 = 20
+addi x3, x1, 5       # x3 = 15
 
-_start:
+# 2. Test ADD/SUB (Register math)
+add  x4, x1, x2      # x4 = 30
+sub  x5, x4, x1      # x5 = 20
 
+# 3. Test Logical Ops
+or   x6, x1, x2      # x6 = 10 | 20 = 30 (0x1E)
+and  x7, x6, x1      # x7 = 30 & 10 = 10 (0x0A)
 
-    # --- TEST UNSIGNED DIVISION ---
-    # 0xFFFFFFFF is -1 as signed, but 4,294,967,295 as unsigned
-    li   x5, -1
-    li   x6, 2
-    divu x14, x5, x6   # x14 = (2^32 - 1) / 2 = 2,147,483,647 (0x7FFFFFFF)
+# 4. Test Load/Store (MEM Stage)
+sw   x4, 4(x0)       # Store value 30 into RAM address 4
+lw   x8, 4(x0)       # Load value from RAM address 4 into x8
 
-    # --- TEST MULTIPLICATION (MUL / MULH) ---
-    li x7, 2000
-    li x8, 3000
-    mul x15, x7, x8    # x15 = 6,000,000
-
-    # Test MULH (Upper 32 bits)
-    # 0x7FFFFFFF * 2 = 0x00000001 FFFFFFFE
-    li x7, 0x7FFFFFFF
-    li x8, 2
-    mul  x16, x7, x8   # x16 = 0xFFFFFFFE (Lower bits)
-    mulh x17, x7, x8   # x17 = 0x00000001 (Upper bits)
-
-    # --- END TEST ---
-    # In a real simulation, we might loop here
-    ebreak             # Signal to debugger/simulator to stop
+# 5. Final result check
+# If everything works, x8 should contain 30 (0x1E)
+addi x0, x0, 0       # NOP (End of test)

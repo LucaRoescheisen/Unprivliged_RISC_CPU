@@ -35,7 +35,7 @@ Load:
     B-type              DONE
     U-type              DONE
     IR                  DONE
-    M Extension
+    M Extension         DONE
     Pipelining
     CSRs
     Timers and Interrupts
