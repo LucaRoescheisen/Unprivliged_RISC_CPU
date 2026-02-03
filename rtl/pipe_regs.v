@@ -2,6 +2,7 @@ module fetch_stage(
     input clk,
     input reset,
     input stall,
+    input flush,
     input pc_src, //1 If Branch
     output [31:0] if_instruction,
     input [31:0] pc_target,
@@ -11,7 +12,6 @@ module fetch_stage(
 
 
   wire [31:0] pc_4 = pc +4;
-  wire [31:0] pc_next = pc_src ? (pc_target) : pc_4;
   assign pc_out = pc_4;
   /*
   The reason why we output pc+4 is to when a jump occurs that when we jump back
@@ -34,11 +34,15 @@ module fetch_stage(
     else begin
       if(stall) begin
        pc <= pc;
-      end else begin
-        pc <= pc_next;
-      end
+      end if(flush) begin  // BRANCH TAKEN
+        pc <= pc_target;  // Jump to target
+    end else begin
+        pc <= pc + 4;     // Normal increment
+
+    end
     end
   end
+
 
 endmodule
 
@@ -51,9 +55,13 @@ module decode_stage(
   //Writeback
   input [31:0] mem_wb_result,
   input [4:0]  wb_rd,          // Which register to write to
+  input [4:0]  ram_rd_reg,
   input [31:0] wb_result,      // The data to write
   input        wb_reg_write,   // The enable signal from WB
   input        wb_is_load_reg,
+
+
+
   //ID-EX Registers
   output [31:0] id_rs1_val,
   output [31:0] id_rs2_val,
@@ -86,6 +94,11 @@ module decode_stage(
   assign id_rd_addr = rd_wire;
 
   wire [31:0] wb_final_data = (wb_is_load_reg) ? mem_wb_result : wb_result;
+
+  assign id_rs1_addr = rs1_wire;
+  assign id_rs2_addr = rs2_wire;
+
+
 
 
 
@@ -133,6 +146,7 @@ endmodule
 
 module execute_stage(
   input clk,
+  input reset,
   input [31:0] id_pc_reg,
   input [31:0] id_pc_4_reg,
   // Data from ID/EX Registers
@@ -150,10 +164,21 @@ module execute_stage(
   input [3:0] id_div_op_reg,
   input       id_div_instruction,
 
+
+//Forwarding Values:
+  input        ex_mem_reg_write_reg,
+  input [4:0]  ex_mem_rd,
+  input [4:0]  mem_wb_rd,
+  input [4:0]  id_rs1_addr,
+  input [4:0]  id_rs2_addr,
+  input [31:0] ex_mem_result_reg,
+  input [31:0] mem_wb_result_reg,
+  input        mem_wb_write_reg,
   // Outputs to EX/MEM Register
   output [31:0] ex_result,
-  output        ex_jump_branch_taken,
+  output        flush,
   output [31:0] ex_pc_target,
+  output [31:0] ex_ram_address,
   //Control
   output divider_busy
 );
@@ -172,17 +197,28 @@ module execute_stage(
   assign ex_jump_branch_taken = id_jal_jump_reg || id_jalr_jump_reg || (id_is_branch_reg && take_branch);
   assign ex_pc_target = (id_jalr_jump_reg) ? target_rs1_imm : target_pc_imm;
 
+  //RAM Address
+  assign ex_ram_address = id_imm_val_reg;
+
   //Result Handling
   assign ex_result = (id_jal_jump_reg || id_jalr_jump_reg) ? id_pc_4_reg: result;
+  assign ram_address = id_rs1_val_reg + id_imm_val_reg;
+  wire [31:0] forward_val_a;
+  wire [31:0] forward_val_b;
 
-wire [31:0] forward_val_a;
-wire [31:0] forward_val_b;
+  assign forward_val_a =
+    (ex_mem_reg_write_reg && (ex_mem_rd != 0) && (ex_mem_rd == id_rs1_addr)) ? ex_mem_result_reg :
+    (mem_wb_write_reg     && (mem_wb_rd != 0) && (mem_wb_rd == id_rs1_addr))  ? mem_wb_result_reg :
+    id_rs1_val_reg ;
 
-
+assign forward_val_b =
+    (ex_mem_reg_write_reg && (ex_mem_rd != 0) && (ex_mem_rd == id_rs2_addr)) ? ex_mem_result_reg :
+    (mem_wb_write_reg     && (mem_wb_rd != 0) && (mem_wb_rd == id_rs2_addr)) ? mem_wb_result_reg :
+    alu_b;
   (* dont_touch = "true" *)
   alu alu_module(
-    .a(id_rs1_val_reg),
-    .b(alu_b),
+    .a(forward_val_a),
+    .b(forward_val_b),
     .alu_op(id_alu_op_reg),
     .result(alu_result)
   );
@@ -208,6 +244,24 @@ wire [31:0] forward_val_b;
     .rs2_val(id_rs2_val_reg),
     .take_branch(take_branch)
   );
+
+
+  reg flush_reg;
+
+always @(posedge clk) begin
+  if (reset) begin
+    flush_reg <= 1'b0;
+  end else begin
+    // Register the branch decision
+    flush_reg <= id_jal_jump_reg || id_jalr_jump_reg ||
+                 (id_is_branch_reg && take_branch);
+  end
+end
+
+assign flush = flush_reg;
+
+
+
 
 endmodule
 

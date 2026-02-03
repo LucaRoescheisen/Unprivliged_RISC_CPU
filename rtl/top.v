@@ -23,6 +23,7 @@ module top(
     .clk(clk),
     .reset(reset),
     .stall(stall),
+    .flush(flush),
     .pc_src(pc_src),
     .if_instruction(IF_ID_instr_wire),
     .pc_target(pc_target),
@@ -34,6 +35,7 @@ module top(
     if(flush || reset) begin
       IF_ID_instr <= 32'b0;
       IF_ID_pc_plus_4 <= 32'b0;
+      IF_ID_pc <= 32'b0;
     end else begin
       if(stall) begin
         IF_ID_instr <= IF_ID_instr;
@@ -52,6 +54,7 @@ module top(
   //Decode Registers
   //Writeback
   reg [4:0]  mem_wb_rd_reg;
+  reg [4:0] ram_wb_rd_reg;
   reg [31:0]  mem_wb_result_reg;
   reg        mem_wb_write_reg;
   reg [31:0] mem_data_out_reg;
@@ -111,8 +114,9 @@ module top(
     .clk(clk),
     .IF_ID_instr(IF_ID_instr),
     .IF_ID_pc(IF_ID_pc_plus_4),
-    .mem_wb_result(mem_data_out_reg),
+    .mem_wb_result(mem_data_out_w),
     .wb_rd(mem_wb_rd_reg),
+    .ram_rd_reg(ram_wb_rd_reg),
     .wb_result(mem_wb_result_reg),
     .wb_reg_write(mem_wb_write_reg),
     .wb_is_load_reg(mem_wb_is_load_reg),
@@ -194,15 +198,17 @@ module top(
   reg [2:0] ex_mem_load_type_reg;
   reg [2:0] ex_mem_store_type_reg;
   reg [31:0] ex_mem_rs2_val_reg;
-
+  reg [31:0] ex_mem_ram_address_reg;
 
   //EX-MEM Wires
   wire [31:0] id_ex_result_w;
   wire [31:0] ex_id_pc_target_w;
   wire div_busy_w;
+  wire [31:0] ex_ram_address_w;
  //**     Execute Stage     **//
   execute_stage execute_stage_module(
     .clk(clk),
+    .reset(reset),
     .id_pc_reg(id_ex_pc_reg),              // Matches your reg name
     .id_pc_4_reg(id_ex_pc_reg_plus_4_reg),     // Matches your reg name
     .id_rs1_val_reg(id_ex_rs1_val_reg),
@@ -216,10 +222,20 @@ module top(
     .id_alu_op_reg(id_ex_alu_op_reg),
     .id_div_op_reg(id_ex_div_op_reg),
     .id_div_instruction(id_ex_div_instruction_reg),
+    .ex_mem_reg_write_reg(ex_mem_reg_write_reg),
+    .ex_mem_rd(ex_mem_rd_addr_reg),
+    .mem_wb_rd(mem_wb_rd_reg),
+    .id_rs1_addr(id_rs1_addr_reg),
+    .id_rs2_addr(id_rs2_addr_reg),
+    .ex_mem_result_reg(ex_mem_result_reg),
+    .mem_wb_result_reg(mem_wb_result_reg),
+    .mem_wb_write_reg(mem_wb_write_reg),
     .ex_result(id_ex_result_w),
-    .ex_jump_branch_taken(flush),
+    .flush(flush),
     .ex_pc_target(pc_target),      // Feed this back to fetch!
+    .ex_ram_address(ex_ram_address_w),
     .divider_busy(div_busy_w)
+
 );
 assign pc_src = flush;
 
@@ -228,6 +244,8 @@ assign pc_src = flush;
         ex_mem_reg_write_reg <= 0;
         ex_mem_is_store_reg  <= 0;
         ex_mem_is_load_reg   <= 0;
+        ex_mem_rd_addr_reg <= 0;
+        ex_mem_result_reg <= 0;
     end
     else if(!stall) begin
       ex_mem_result_reg <= id_ex_result_w;
@@ -238,6 +256,7 @@ assign pc_src = flush;
       ex_mem_load_type_reg <= id_ex_load_type_reg;
       ex_mem_store_type_reg <= id_ex_store_type_reg;
       ex_mem_rs2_val_reg <=  id_ex_rs2_val_reg;
+      ex_mem_ram_address_reg <= ex_ram_address_w;
     end
 
  end
@@ -246,8 +265,11 @@ assign pc_src = flush;
 
   wire mem_busy_w;
   wire [31:0] mem_data_out_w;
-
-
+  reg [4:0] d_mem_wb_rd_reg;
+  reg [31:0] d_mem_wb_result_reg;
+  reg d_mem_wb_write_reg;
+  reg d_mem_wb_is_load_reg;
+  reg [31:0] d_mem_data_out_reg;
    //**     Memory Stage/Writeback     **//
   data_memory ram_unit (
     .clk(clk),
@@ -255,8 +277,7 @@ assign pc_src = flush;
     .store_type(ex_mem_store_type_reg),
     .mem_read_en(ex_mem_is_load_reg),
     .mem_write_en(ex_mem_is_store_reg),
-    .ram_address_store(ex_mem_result_reg),
-    .ram_address_load(ex_mem_result_reg),
+    .ram_address(ex_mem_ram_address_reg),
     .data_in(ex_mem_rs2_val_reg),
     .data_out(mem_data_out_w),
     .mem_busy(mem_busy_w)
@@ -266,22 +287,27 @@ assign stall = div_busy_w; //SETS STALL
 
  always @(posedge clk) begin
     if(reset) begin
-        mem_wb_write_reg <= 0;
+        mem_wb_rd_reg      <= 0;
+        mem_wb_result_reg  <= 0;
+        mem_wb_write_reg   <= 0;
+        mem_data_out_reg   <= 0;
         mem_wb_is_load_reg <= 0;
-        mem_wb_result_reg <= 0;
+        // Clean up the old delay regs
+
+
     end
     else if(!stall) begin
-      mem_wb_result_reg <= ex_mem_result_reg;
-      mem_wb_rd_reg <= ex_mem_rd_addr_reg;
-      mem_wb_write_reg <= ex_mem_reg_write_reg;
-      mem_data_out_reg <= mem_data_out_w;
-      mem_wb_is_load_reg <= ex_mem_is_load_reg;
+
+        mem_wb_rd_reg      <= ex_mem_rd_addr_reg;  // The destination
+        mem_wb_result_reg  <= ex_mem_result_reg;   // The ALU result
+        mem_wb_write_reg   <= ex_mem_reg_write_reg;
+        mem_wb_is_load_reg <= ex_mem_is_load_reg;  // The Mux selector
+        mem_data_out_reg   <= mem_data_out_w;
     end
-
- end
-
+end
 
   //**-----------------------**//
+
 
 
 endmodule

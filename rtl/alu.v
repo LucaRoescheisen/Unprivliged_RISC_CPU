@@ -10,6 +10,7 @@ module alu(
   wire [63:0] full_product_u_u = a * b;
 
 always @(*) begin //Process OPCODES
+  $display(alu_op);
   case(alu_op)
   //R-TYPE
   5'b00000 : result = a + b;                       // ADD

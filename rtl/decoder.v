@@ -86,34 +86,16 @@ always @(*) begin //Anytime the input signal changes
       decoder_illegal = 0;
     end
     7'b0000011: begin // I-type : LOAD
-      case(instr[14:12])
-        3'b000: begin//LOAD BYTE
-          is_load = 1'b1;
-          load_type = instr[14:12];
-          decoder_illegal = 0;
-        end
-        3'b001: begin//LOAD HALF
-          is_load = 1'b1;
-          load_type = instr[14:12];
-          decoder_illegal = 0;
-        end
-        3'b010: begin//LOAD WORD
-          is_load = 1'b1;
-          load_type = instr[14:12];
-          decoder_illegal = 0;
-        end
-        3'b100: begin//LOAD BYTE (U)
-          is_load = 1'b1;
-          load_type = instr[14:12];
-          decoder_illegal = 0;
-        end
-        3'b101: begin//LOAD HALF (U)
-          is_load = 1'b1;
-          load_type = instr[14:12];
-          decoder_illegal = 0;
-        end
-      endcase
+      rs1 = instr[19:15];
+      rd  = instr[11:7];
+      imm = {{20{instr[31]}}, instr[31:20]};
+      is_load = 1'b1;
+      load_type = instr[14:12];
+      decoder_illegal = 0;
+      reg_write = 1;
     end
+
+
 
     7'b0100011: begin //S-Type : STORE
       is_store = 1'b1;

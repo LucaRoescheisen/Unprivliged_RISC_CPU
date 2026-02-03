@@ -22,6 +22,8 @@ end
       end
       3'b001: begin
         $display("BNE");
+            $display("BNE: rs1_val=%0d (hex: %h), rs2_val=%0d (hex: %h), equal?=%b",
+             rs1_val, rs1_val, rs2_val, rs2_val, (rs1_val == rs2_val));
         if(rs1_val != rs2_val) take_branch = 1'b1;  //BNE
       end
       3'b100: begin

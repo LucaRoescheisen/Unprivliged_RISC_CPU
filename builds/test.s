@@ -1,23 +1,50 @@
-# RISC-V Base Integer Test
-# No branches, no complex math
+# branch_test.s
+# Tests: BEQ, BNE, JAL, and Branch-not-taken behavior
 
-# 1. Test ADDI (Immediate math)
-addi x1, x0, 10      # x1 = 10
-addi x2, x0, 20      # x2 = 20
-addi x3, x1, 5       # x3 = 15
+.text
+.globl _start
 
-# 2. Test ADD/SUB (Register math)
-add  x4, x1, x2      # x4 = 30
-sub  x5, x4, x1      # x5 = 20
+_start:
+    # Initialize registers
+    addi x1, x0, 10      # x1 = 10
+    addi x2, x0, 10      # x2 = 10
+    addi x3, x0, 20      # x3 = 20
+    addi x4, x0, 0       # x4 = counter (0)
 
-# 3. Test Logical Ops
-or   x6, x1, x2      # x6 = 10 | 20 = 30 (0x1E)
-and  x7, x6, x1      # x7 = 30 & 10 = 10 (0x0A)
+    # 1. Test BEQ (Branch Taken - Forward)
+    beq x1, x2, test_bne # Should branch to test_bne
+    addi x4, x4, 1       # This should be FLUSHED (x4 should stay 0)
 
-# 4. Test Load/Store (MEM Stage)
-sw   x4, 4(x0)       # Store value 30 into RAM address 4
-lw   x8, 4(x0)       # Load value from RAM address 4 into x8
+test_bne:
+    # 2. Test BNE (Branch Not Taken)
+    bne x1, x2, fail     # Should NOT branch (10 == 10)
+    addi x4, x4, 2       # Should execute (x4 = 2)
 
-# 5. Final result check
-# If everything works, x8 should contain 30 (0x1E)
-addi x0, x0, 0       # NOP (End of test)
+    # 3. Test BNE (Branch Taken - Forward)
+    bne x1, x3, test_jal # Should branch to test_jal
+    addi x4, x4, 10      # This should be FLUSHED
+
+test_jal:
+    # 4. Test JAL (Unconditional Jump)
+    jal x5, loop_setup   # Jump to loop_setup, link PC to x5
+    addi x4, x4, 100     # This should be FLUSHED
+
+fail:
+    addi x4, x0, 911     # Error indicator: x4 = 911
+    ebreak               # Stop execution
+
+loop_setup:
+    addi x1, x0, 0       # reset x1 for loop counter
+    addi x2, x0, 5       # loop limit
+
+loop_start:
+    # 5. Test Backward Branch (Loop)
+    addi x1, x1, 1       # x1++
+    bne x1, x2, loop_start # Loop back if x1 != 5
+
+    # Final Success State
+    # If successful:
+    # x1 = 5
+    # x4 = 2
+    addi x10, x0, 1      # Success flag: x10 = 1
+    ebreak

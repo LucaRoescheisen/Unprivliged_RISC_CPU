@@ -25,9 +25,9 @@ initial begin
         int_regs[i] = 32'b0;
     end
 end
-
-assign rs1_val = int_regs[rs1];
-assign rs2_val = int_regs[rs2];
+// As the memory array is only updated at the end of the clock cycle we want to get result directly
+assign rs1_val = (rs1 == rd && reg_write && rs1 != 0) ? result : int_regs[rs1];
+assign rs2_val = (rs2 == rd && reg_write && rs2 != 0) ? result : int_regs[rs2];
 
 
 always @(posedge clk) begin
