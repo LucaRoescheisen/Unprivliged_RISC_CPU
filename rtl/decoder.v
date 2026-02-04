@@ -19,7 +19,8 @@ module decoder(
   output reg[2:0] div_op,
   output reg div_start,
   output reg is_div_instruction,
-  output reg is_lui
+  output reg is_lui,
+  output reg cpu_halt
 );
 
   initial begin
@@ -38,12 +39,28 @@ always @(*) begin //Anytime the input signal changes
   store_type= 0; div_start = 0; is_div_instruction = 0;
   is_lui = 0;
   case(instr[6:0])     //Identify OP code
+    7'b1110011: begin  //E-CALL
+      case(instr[31:20])
+        12'b000000000000: begin
+          cpu_halt = 1;
+              $display("ecall");
+        end
+        12'b000000000001:
+        begin
+          cpu_halt = 1;
+              $display("ebreak");
+        end
+      endcase
+    end
+
+
     7'b0110111: begin //LUI
       rd = instr[11:7];
-      imm = instr[31:12] << 12;
+      imm = {instr[31:12], 12'b0};
       reg_write = 1'b1;
       is_lui = 1'b1;
       decoder_illegal = 0;
+      $display("LUI");
     end
 
     7'b0110011: begin //ALU R-Type
@@ -110,6 +127,7 @@ always @(*) begin //Anytime the input signal changes
 
     default begin
        is_lui = 0;
+       cpu_halt = 0;
       store_type= 3'b0;
       is_load = 1'b0;
       is_store = 1'b0;
@@ -143,6 +161,7 @@ always @(*) begin //Anytime the input signal changes
                 div_op = 3'b100; // DIV
                 div_start = 1'b1;
                 is_div_instruction = 1'b1;
+                $display("DIV");
              end
           endcase
         end
@@ -153,6 +172,7 @@ always @(*) begin //Anytime the input signal changes
                 div_op = 3'b110; // REMAINDER
                 div_start = 1'b1;
                 is_div_instruction = 1'b1;
+                 $display("R");
              end
           endcase
         end
@@ -165,6 +185,7 @@ always @(*) begin //Anytime the input signal changes
                 div_op = 3'b111; // REMAINDER (U)
                 div_start = 1'b1;
                 is_div_instruction = 1'b1;
+                 $display("R U");
              end
           endcase
         end
@@ -182,6 +203,7 @@ always @(*) begin //Anytime the input signal changes
                 div_op = 3'b101; // DIV (U)
                 div_start = 1'b1;
                 is_div_instruction = 1'b1;
+                $display("DIV U");
              end
           endcase
         end

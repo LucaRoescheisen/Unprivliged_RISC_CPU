@@ -3,6 +3,7 @@ module fetch_stage(
     input reset,
     input stall,
     input flush,
+    input cpu_halt,
     input pc_src, //1 If Branch
     output [31:0] if_instruction,
     input [31:0] pc_target,
@@ -18,7 +19,7 @@ module fetch_stage(
   we dont jump to the same instruction (infinite loop), instead we go to the next instruciton
   */
 
-  reg [31:0] instr [0:17];
+  reg [31:0] instr [0:512];
   assign if_instruction = instr[pc >> 2];
 
   initial begin
@@ -32,9 +33,9 @@ module fetch_stage(
       $display("yooo");
     end
     else begin
-      if(stall) begin
+      if(stall || cpu_halt) begin
        pc <= pc;
-      end if(flush) begin  // BRANCH TAKEN
+      end else if(flush) begin  // BRANCH TAKEN
         pc <= pc_target;  // Jump to target
     end else begin
         pc <= pc + 4;     // Normal increment
@@ -85,8 +86,8 @@ module decode_stage(
   output [2:0]  id_store_type,
   output        id_div_start,
   output        id_div_instruction,
-  output        id_is_lui
-
+  output        id_is_lui,
+  output        cpu_halt
 );
   wire [4:0] rs1_wire;
   wire [4:0] rs2_wire;
@@ -124,7 +125,8 @@ module decode_stage(
     .div_op(id_div_op),
     .div_start(id_div_start),
     .is_div_instruction(id_div_instruction),
-    .is_lui(id_is_lui)
+    .is_lui(id_is_lui),
+    .cpu_halt(cpu_halt)
   );
 
 
@@ -163,7 +165,7 @@ module execute_stage(
   input [4:0] id_alu_op_reg,
   input [3:0] id_div_op_reg,
   input       id_div_instruction,
-
+  input [4:0] id_ex_is_lui_reg,
 
 //Forwarding Values:
   input        ex_mem_reg_write_reg,
@@ -180,20 +182,23 @@ module execute_stage(
   output [31:0] ex_pc_target,
   output [31:0] ex_ram_address,
   //Control
-  output divider_busy
+  output divider_busy,
+  output divider_finished_comb
 );
 
   wire [31:0] div_result, alu_result;
-  wire [31:0] alu_b = id_alu_src_reg ? id_imm_val_reg : id_rs2_val_reg;
-  wire [31:0] result = id_div_instruction ? div_result : alu_result;
+  wire [31:0] alu_b = id_alu_src_reg ? id_imm_val_reg : forward_val_b;
+  wire [31:0] result = id_div_instruction ? div_result : (id_ex_is_lui_reg) ? id_imm_val_reg : alu_result;
 
+  wire divider_finished;
+  assign divider_finished_comb = id_div_instruction && divider_finished;
   wire div_busy;
   assign divider_busy = div_busy;
-  wire divider_trigger = id_div_instruction && !div_busy;
+  wire divider_trigger = id_div_instruction && !div_busy && !divider_finished;
 
   wire take_branch;
   wire [31:0] target_pc_imm   = id_pc_reg + id_imm_val_reg; // For JAL and Branches
-  wire [31:0] target_rs1_imm  = (id_rs1_val_reg + id_imm_val_reg) & ~32'h1; //For JALR
+  wire [31:0] target_rs1_imm  = (forward_val_a + id_imm_val_reg) & ~32'h1; //For JALR
   assign ex_jump_branch_taken = id_jal_jump_reg || id_jalr_jump_reg || (id_is_branch_reg && take_branch);
   assign ex_pc_target = (id_jalr_jump_reg) ? target_rs1_imm : target_pc_imm;
 
@@ -201,20 +206,25 @@ module execute_stage(
   assign ex_ram_address = id_imm_val_reg;
 
   //Result Handling
-  assign ex_result = (id_jal_jump_reg || id_jalr_jump_reg) ? id_pc_4_reg: result;
-  assign ram_address = id_rs1_val_reg + id_imm_val_reg;
+  assign ex_result = (id_jal_jump_reg || id_jalr_jump_reg) ? id_pc_4_reg:  result;
+  assign ram_address = forward_val_a + id_imm_val_reg;
   wire [31:0] forward_val_a;
-  wire [31:0] forward_val_b;
+  wire [31:0] forward_val_b_inter;
 
   assign forward_val_a =
+
     (ex_mem_reg_write_reg && (ex_mem_rd != 0) && (ex_mem_rd == id_rs1_addr)) ? ex_mem_result_reg :
     (mem_wb_write_reg     && (mem_wb_rd != 0) && (mem_wb_rd == id_rs1_addr))  ? mem_wb_result_reg :
     id_rs1_val_reg ;
 
-assign forward_val_b =
+   assign forward_val_b_inter =
     (ex_mem_reg_write_reg && (ex_mem_rd != 0) && (ex_mem_rd == id_rs2_addr)) ? ex_mem_result_reg :
     (mem_wb_write_reg     && (mem_wb_rd != 0) && (mem_wb_rd == id_rs2_addr)) ? mem_wb_result_reg :
-    alu_b;
+    id_rs2_val_reg;
+
+
+  wire [31:0] forward_val_b = id_alu_src_reg ? id_imm_val_reg : forward_val_b_inter;
+
   (* dont_touch = "true" *)
   alu alu_module(
     .a(forward_val_a),
@@ -227,12 +237,13 @@ assign forward_val_b =
   (* dont_touch = "true" *)
     divider divider_module(
     .clk(clk),
-    .divisor(id_rs1_val_reg),
-    .dividend(id_rs2_val_reg),
+    .divisor(forward_val_b),
+    .dividend(forward_val_a),
     .start(divider_trigger),
     .div_op(id_div_op_reg),
     .result(div_result),
-    .busy(div_busy)
+    .busy(div_busy),
+    .finished(divider_finished)
   );
 
 
@@ -240,8 +251,8 @@ assign forward_val_b =
   branch_unit branch_unit_module(
     .is_branch(id_is_branch_reg),
     .b_type(id_branch_type_reg),
-    .rs1_val(id_rs1_val_reg),
-    .rs2_val(id_rs2_val_reg),
+    .rs1_val(forward_val_a),
+    .rs2_val(forward_val_b),
     .take_branch(take_branch)
   );
 

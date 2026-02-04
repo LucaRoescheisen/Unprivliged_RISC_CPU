@@ -5,6 +5,7 @@ module top(
   //Hazards
   wire stall;
   wire flush;
+  wire cpu_halt;
   //IFID Pipline Registers
   reg [31:0] IF_ID_instr;
   reg [31:0] IF_ID_pc_plus_4;
@@ -24,6 +25,7 @@ module top(
     .reset(reset),
     .stall(stall),
     .flush(flush),
+    .cpu_halt(cpu_halt),
     .pc_src(pc_src),
     .if_instruction(IF_ID_instr_wire),
     .pc_target(pc_target),
@@ -41,7 +43,12 @@ module top(
         IF_ID_instr <= IF_ID_instr;
         IF_ID_pc_plus_4 <= IF_ID_pc_plus_4;
         IF_ID_pc <= IF_ID_pc;
-      end else begin
+      end else if(cpu_halt) begin
+        IF_ID_instr <= IF_ID_instr;
+        IF_ID_pc_plus_4 <= IF_ID_pc_plus_4;
+        IF_ID_pc <= IF_ID_pc;
+      end
+      else begin
         IF_ID_instr <= IF_ID_instr_wire;
         IF_ID_pc_plus_4 <= pc_out_wire;
         IF_ID_pc <= IF_ID_wire;
@@ -84,7 +91,7 @@ module top(
   reg [2:0]  id_ex_store_type_reg;
   reg        id_ex_div_start_reg;
   reg        id_ex_div_instruction_reg;
-  reg        id_ex_is_lui_reg;
+  reg [4:0]       id_ex_is_lui_reg;
   //ID-EX Wires
   wire [4:0]  id_rs1_addr_w;
   wire [4:0]  id_rs2_addr_w;
@@ -141,7 +148,8 @@ module top(
     .id_store_type(id_store_type_w),
     .id_div_start(id_div_start_w),
     .id_div_instruction(id_div_instruction_w),
-    .id_is_lui(id_is_lui_w)
+    .id_is_lui(id_is_lui_w),
+    .cpu_halt(cpu_halt)
   );
 
   always @(posedge clk) begin
@@ -155,7 +163,7 @@ module top(
       id_ex_jalr_jump_reg <= 0;
       id_ex_div_instruction_reg <= 0;
     end
-    else if(!stall) begin
+    else if(!stall && !cpu_halt) begin
       id_ex_pc_reg_plus_4_reg <= IF_ID_pc_plus_4;
       id_ex_pc_reg <= IF_ID_pc;
       id_ex_rs1_val_reg <=id_rs1_val_w;
@@ -199,11 +207,12 @@ module top(
   reg [2:0] ex_mem_store_type_reg;
   reg [31:0] ex_mem_rs2_val_reg;
   reg [31:0] ex_mem_ram_address_reg;
-
+  reg [4:0] ex_mem_is_lui_reg;
   //EX-MEM Wires
   wire [31:0] id_ex_result_w;
   wire [31:0] ex_id_pc_target_w;
   wire div_busy_w;
+  wire divider_finished_w;
   wire [31:0] ex_ram_address_w;
  //**     Execute Stage     **//
   execute_stage execute_stage_module(
@@ -222,6 +231,7 @@ module top(
     .id_alu_op_reg(id_ex_alu_op_reg),
     .id_div_op_reg(id_ex_div_op_reg),
     .id_div_instruction(id_ex_div_instruction_reg),
+    .id_ex_is_lui_reg(id_ex_is_lui_reg),
     .ex_mem_reg_write_reg(ex_mem_reg_write_reg),
     .ex_mem_rd(ex_mem_rd_addr_reg),
     .mem_wb_rd(mem_wb_rd_reg),
@@ -234,7 +244,8 @@ module top(
     .flush(flush),
     .ex_pc_target(pc_target),      // Feed this back to fetch!
     .ex_ram_address(ex_ram_address_w),
-    .divider_busy(div_busy_w)
+    .divider_busy(div_busy_w),
+    .divider_finished_comb(divider_finished_w)
 
 );
 assign pc_src = flush;
@@ -257,6 +268,7 @@ assign pc_src = flush;
       ex_mem_store_type_reg <= id_ex_store_type_reg;
       ex_mem_rs2_val_reg <=  id_ex_rs2_val_reg;
       ex_mem_ram_address_reg <= ex_ram_address_w;
+      ex_mem_is_lui_reg  <= id_ex_is_lui_reg;
     end
 
  end
@@ -282,8 +294,9 @@ assign pc_src = flush;
     .data_out(mem_data_out_w),
     .mem_busy(mem_busy_w)
 );
-
-assign stall = div_busy_w; //SETS STALL
+  wire early_stall = id_ex_div_instruction_reg && !div_busy_w && !divider_finished_w;
+  wire normal_stall = div_busy_w;
+  assign stall = early_stall || normal_stall;
 
  always @(posedge clk) begin
     if(reset) begin
