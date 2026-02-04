@@ -20,7 +20,8 @@ module decoder(
   output reg div_start,
   output reg is_div_instruction,
   output reg is_lui,
-  output reg cpu_halt
+  output reg cpu_halt,
+  output reg is_auipc
 );
 
   initial begin
@@ -37,9 +38,9 @@ always @(*) begin //Anytime the input signal changes
   is_load = 0;load_type = 0;
   is_store = 0; decoder_illegal = 0;
   store_type= 0; div_start = 0; is_div_instruction = 0;
-  is_lui = 0;
+  is_lui = 0; is_auipc = 0;
   case(instr[6:0])     //Identify OP code
-    7'b1110011: begin  //E-CALL
+    7'b1110011: begin  //E-CALL E-BREAK
       case(instr[31:20])
         12'b000000000000: begin
           cpu_halt = 1;
@@ -53,6 +54,14 @@ always @(*) begin //Anytime the input signal changes
       endcase
     end
 
+    7'b0110111: begin //AUIPC
+      rd = instr[11:7];
+      imm = {instr[31:12], 12'b0};
+      reg_write = 1'b1;
+      is_auipc = 1'b1;
+      decoder_illegal = 0;
+      $display("LUI");
+    end
 
     7'b0110111: begin //LUI
       rd = instr[11:7];
@@ -128,6 +137,7 @@ always @(*) begin //Anytime the input signal changes
     default begin
        is_lui = 0;
        cpu_halt = 0;
+       is_auipc = 0;
       store_type= 3'b0;
       is_load = 1'b0;
       is_store = 1'b0;

@@ -91,7 +91,8 @@ module top(
   reg [2:0]  id_ex_store_type_reg;
   reg        id_ex_div_start_reg;
   reg        id_ex_div_instruction_reg;
-  reg [4:0]       id_ex_is_lui_reg;
+  reg [4:0]  id_ex_is_lui_reg;
+  reg       id_ex_is_auipc;
   //ID-EX Wires
   wire [4:0]  id_rs1_addr_w;
   wire [4:0]  id_rs2_addr_w;
@@ -115,7 +116,7 @@ module top(
   wire        id_div_start_w;
   wire        id_div_instruction_w;
   wire        id_is_lui_w;
-
+  wire        id_is_auipc;
   //**     Decode Stage     **//
   decode_stage decode_stage_mod(
     .clk(clk),
@@ -149,7 +150,8 @@ module top(
     .id_div_start(id_div_start_w),
     .id_div_instruction(id_div_instruction_w),
     .id_is_lui(id_is_lui_w),
-    .cpu_halt(cpu_halt)
+    .cpu_halt(cpu_halt),
+    .is_auipc(id_is_auipc)
   );
 
   always @(posedge clk) begin
@@ -188,6 +190,7 @@ module top(
       id_ex_is_lui_reg <= id_is_lui_w;
       id_rs1_addr_reg <=id_rs1_addr_w;
       id_rs2_addr_reg <=id_rs2_addr_w;
+      id_ex_is_auipc <= id_is_auipc;
     end
 
   end
@@ -232,6 +235,7 @@ module top(
     .id_div_op_reg(id_ex_div_op_reg),
     .id_div_instruction(id_ex_div_instruction_reg),
     .id_ex_is_lui_reg(id_ex_is_lui_reg),
+    .id_ex_is_auipc(id_ex_is_auipc),
     .ex_mem_reg_write_reg(ex_mem_reg_write_reg),
     .ex_mem_rd(ex_mem_rd_addr_reg),
     .mem_wb_rd(mem_wb_rd_reg),

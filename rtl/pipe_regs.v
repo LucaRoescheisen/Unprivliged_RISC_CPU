@@ -87,7 +87,8 @@ module decode_stage(
   output        id_div_start,
   output        id_div_instruction,
   output        id_is_lui,
-  output        cpu_halt
+  output        cpu_halt,
+  output        is_auipc
 );
   wire [4:0] rs1_wire;
   wire [4:0] rs2_wire;
@@ -165,8 +166,8 @@ module execute_stage(
   input [4:0] id_alu_op_reg,
   input [3:0] id_div_op_reg,
   input       id_div_instruction,
-  input [4:0] id_ex_is_lui_reg,
-
+  input       id_ex_is_lui_reg,
+  input        id_ex_is_auipc
 //Forwarding Values:
   input        ex_mem_reg_write_reg,
   input [4:0]  ex_mem_rd,
@@ -188,7 +189,7 @@ module execute_stage(
 
   wire [31:0] div_result, alu_result;
   wire [31:0] alu_b = id_alu_src_reg ? id_imm_val_reg : forward_val_b;
-  wire [31:0] result = id_div_instruction ? div_result : (id_ex_is_lui_reg) ? id_imm_val_reg : alu_result;
+  wire [31:0] result = id_div_instruction ? div_result : (id_ex_is_lui_reg) ? id_imm_val_reg : (id_ex_is_auipc) ? (id_pc_reg + id_imm_val_reg) : alu_result;
 
   wire divider_finished;
   assign divider_finished_comb = id_div_instruction && divider_finished;
