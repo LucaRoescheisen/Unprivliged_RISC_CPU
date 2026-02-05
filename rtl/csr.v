@@ -1,0 +1,179 @@
+module csr(
+ input clk,
+ input reset,
+ input [1:0] current_privilege,
+ input [11:0] csr_addr,
+ input [3:0] csr_func,
+ input [31:0] csr_w_data,
+ input csr_write_enable,
+//Trap Handling
+
+ input        is_trap,
+ input [31:0] trap_instr_pc,
+  input [31:0] trap_cause,
+//Interrupt Handling
+input extr_iqr;
+input [31:0] current_pc;
+
+
+ output [31:0] csr_r_data,
+ output [31:0] next_pc
+ output flush_from_interrupt
+);
+
+//MVENDORID : 0xF11
+reg [31:0] mvendorid;
+always @(posedge clk) begin
+  mvendorid <= 32'b0;
+end
+
+
+//MARCHID: 0xF12
+reg [31:0] marchid;
+always @(posedge clk) begin
+  marchid <= 32'b0;
+end
+
+
+//MIMPID : 0xF13
+reg [31:0] mimpid;
+always @(posedge clk) begin
+  mimpid <= 32'b00000000000000000000000000000001; //Update on architecture changes
+end
+
+
+//MHARTID: 0xF14
+reg [31:0] mhartid;
+always @(posedge clk) begin
+  mhartid <= 32'b0;     //Single-hart system
+end
+
+
+//mstatus: 0x300
+reg [31:0] mstatus = 32'b0;
+localparam MIE 3,
+           MPIE 7,
+           MPP_LOW 11,
+           MPP_HIGH 12;
+/*
+  Tracks CPU privilege and interrupt state
+  BIT 3     : MIE  : Machine Interrupt Enable
+  BIT 7     : MPIE : Machine Previous Interrupt Enable
+  BIT 12:11 : MPP  : Machine previous privilege
+*/
+
+
+//misa: 0x301
+reg [31:0] misa;
+always @(posedge clk) begin
+  misa <= 32'b00000000000000000100001000000000; //Set bits for 32I and M-Extension
+end
+
+
+//MIE : 0x304  MRW
+reg [31:0] mie = 32'b00000000000000000000100010001000;
+/*
+  Mask Interrupt Register
+    Controls which interrupt sources are enabled
+    Software writes to this
+    Is not cleared on traps
+
+    BIT 11 : Machine External Interrupt Enable
+    BIT  7 : Machine Timer Interrupt Enabe
+    BIT  3 : Machine Software Interrupt Enable
+
+*/
+
+
+//MIE : 0x344  MRW
+reg [31:0] mip = 32'b00000000000000000000100010001000;
+/*
+  Interrupt Pending Bits
+    Set by hardware
+    Cleared by software
+
+    BIT 11 : External Interrupt Pending
+    BIT  7 : Timer Interrupt Pending
+    BIT  3 : Software Interrupt Pending
+
+*/
+
+wire is_mret; //(instr == 32'h30200073);
+
+//MTVEC : 0x305 MRW
+reg [31:0] mtvec;
+
+//MEPC : 0x341 MRW
+reg [31:0] mepc;
+
+//MCAUSE : 0x342 MRW
+reg [31:0] mcause;
+
+//MSCRATCH : 0x340 MRW
+reg [31:0] mscratch;
+
+//MCYCLE : 0xB00 MRW
+reg [31:0] mcycle;
+
+//MCYCLEH : 0xB80 MRW
+reg [31:0] mcycleh;
+
+//MINSTRET : 0xB02 MRW
+reg [31:0] minstret;
+
+//MINSTRETH : 0xB82 MRW
+reg [31:0] minstreth;
+
+
+
+wire take_interrupt = mstatus[3] && mie[11] && mip[11]; //global enabled && source enable && source pending
+always @(posedge clk or posedge reset) begin
+  if(reset) begin
+    mstatus <= 32'b0;
+    mepc <= 32'b0;
+  end
+  else if(is_trap) begin
+    mepc <= trap_instr_pc;
+    mcause <= trap_cause;
+    mstatus[`MPP_HIGH:`MPP_LOW] <= current_privilege; // saves old current_privilege
+    current_privilege <= 1'b11 //swtich to machine mode to give OS highest current_privilege to access CSRs
+    mstatus[`MIE] <=  1'b0; //disables interrupts
+    next_pc <= mtvec; //mtvec is declared from  the Trap Handler in OS
+  end
+  else if (take_interrupt) begin//Interrupts are enabled!
+    mcause <= {1'b1, 30'b0, 1'b1};                     //Machine interrupt
+    mepc <= current_pc + 4;
+    mcause <= current_pc + 4;
+
+    mstatus[`MPP_HIGH:`MPP_LOW]  <= current_privilege;
+    mstatus[`MPIE] <=  mstatus[`MIE];
+    mstatus[`MIE] <=  1'b0;
+    next_privilege <= 1'b11; //Machine
+    next_pc <= mtvec;
+    flush_from_interrupt <= 1;
+
+  end
+  else if (is_mret) begin            //Interrupt Handled
+    next_privilege <= mstatus[`MPP_HIGH:`MPP_LOW];
+    mstatus[`MIE] <= mstatus[`MPIE]; //Save the previous interrupt bit
+    mstatus[MPIE] <= 1'b1;           //Enable interrupts
+    next_pc <= mpec;                 //Move program counter to position specified by the trap handler
+    flush_from_interrupt <= 1;       //Flush pipeline
+  end
+  else begin
+    case(csr_addr)
+      3'h300: begin
+        case(csr_func)
+          3'b001: begin //CSSRW Atomic read-write
+           mstatus <= csr_w_data;
+           csr_r_data <= mstatus;
+          end
+        endcase
+      end
+    endcase
+  end
+end
+
+
+
+endmodule

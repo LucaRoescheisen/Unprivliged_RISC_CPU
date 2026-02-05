@@ -2,6 +2,14 @@ module top(
   input clk,
   input reset
 );
+  //Privilege
+  reg [1:0] privilege = 2'b11; //starts at machine priv
+
+  //Interrupt //should be inputs
+  wire gpio0_irq;
+  wire gpio1_irq;
+  wire ext_iqr = gpio0_irq || gpio1_igpio1_irqnter;
+
   //Hazards
   wire stall;
   wire flush;
