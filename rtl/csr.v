@@ -175,6 +175,16 @@ always @(posedge clk or posedge reset) begin
               3'b110: mstatus <= ~csr_imm & csr_w_data; //CSRRCI
             endcase
           end
+            12'h300: begin //TEST
+            case(csr_func)
+              3'b001: mstatus <= csr_w_data;//CSSRW Atomic read-write
+              3'b010: mstatus <= csr_w_data | mstatus;//CSSRS
+              3'b011: mstatus <= ~csr_w_data & mstatus;//CSSRC
+              3'b100: mstatus <= csr_imm;//CSSRWI
+              3'b101: mstatus <= csr_imm | csr_w_data;//CSSRI
+              3'b110: mstatus <= ~csr_imm & csr_w_data; //CSRRCI
+            endcase
+          end
           12'h305: begin //MTVEC
             case(csr_func)
               3'b001: begin
