@@ -161,16 +161,36 @@ always @(posedge clk or posedge reset) begin
     flush_from_interrupt <= 1;       //Flush pipeline
   end
   else begin
-    case(csr_addr)
-      3'h300: begin
-        case(csr_func)
-          3'b001: begin //CSSRW Atomic read-write
-           mstatus <= csr_w_data;
-           csr_r_data <= mstatus;
+    if(csr_write_enable) begin
+      if(current_privilege == 2'b11) begin
+         csr_r_data <= mstatus;
+        case(csr_addr)
+          12'h300: begin //MSTATUS
+            case(csr_func)
+              3'b001: mstatus <= csr_w_data;//CSSRW Atomic read-write
+              3'b010: mstatus <= csr_w_data | mstatus;//CSSRS
+              3'b011: mstatus <= ~csr_w_data & mstatus;//CSSRC
+              3'b100: mstatus <= csr_imm;//CSSRWI
+              3'b101: mstatus <= csr_imm | csr_w_data;//CSSRI
+              3'b110: mstatus <= ~csr_imm & csr_w_data; //CSRRCI
+            endcase
+          end
+          12'h305: begin //MTVEC
+            case(csr_func)
+              3'b001: begin
+                mtvec <= csr_w_data;
+                csr_r_data <= mtvec;
+              end
+            endcase
           end
         endcase
       end
-    endcase
+      else begin
+        take_trap <= 1;
+        trap_cause <= ILLEGAL_INSTR;
+        trap_pc <= current_pc;
+      end
+    end
   end
 end
 
