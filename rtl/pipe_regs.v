@@ -8,7 +8,8 @@ module fetch_stage(
     output [31:0] if_instruction,
     input [31:0] pc_target,
     output [31:0] pc_out,
-    output reg [31:0] pc //Program counter (Holds address of current instruction)
+    output reg [31:0] pc, //Program counter (Holds address of current instruction)
+    output pc_trap
 );
 
 
@@ -21,6 +22,8 @@ module fetch_stage(
 
   reg [31:0] instr [0:512];
   assign if_instruction = instr[pc >> 2];
+
+  assign pc_trap = (pc[1:0] != 2'b00);
 
   initial begin
     $readmemh("D:/u_risc/programs/test.hex", instr);
@@ -177,6 +180,11 @@ module execute_stage(
   input [31:0] ex_mem_result_reg,
   input [31:0] mem_wb_result_reg,
   input        mem_wb_write_reg,
+
+  input [2:0] load_type,
+  input [2:0] store_type,
+  input is_load,
+  input is store,
   // Outputs to EX/MEM Register
   output [31:0] ex_result,
   output        flush,
@@ -184,7 +192,8 @@ module execute_stage(
   output [31:0] ex_ram_address,
   //Control
   output divider_busy,
-  output divider_finished_comb
+  output divider_finished_comb,
+  output reg misaligned;
 );
 
   wire [31:0] div_result, alu_result;
@@ -204,7 +213,21 @@ module execute_stage(
   assign ex_pc_target = (id_jalr_jump_reg) ? target_rs1_imm : target_pc_imm;
 
   //RAM Address
-  assign ex_ram_address = id_imm_val_reg;
+  assign ex_ram_address = forward_val_a + id_imm_val_reg;
+
+  //check for misaligned bit
+
+  always @(*) begin
+    misaligned = 1'b0;
+    if(is_load) begin
+      misaligned = (load_type == 3'b010 && ex_ram_address[1:0] != 2'b00) |
+                    (load_type == 3'b01 && ex_ram_address[0] != 1'b0);
+    end
+    else if(is_store) begin
+      misaligned = (store_type == 3'b010 && ex_ram_address[1:0] != 2'b00) |
+                    (store_type == 3'b01 && ex_ram_address[0] != 1'b0);
+    end
+  end
 
   //Result Handling
   assign ex_result = (id_jal_jump_reg || id_jalr_jump_reg) ? id_pc_4_reg:  result;

@@ -21,7 +21,8 @@ module decoder(
   output reg is_div_instruction,
   output reg is_lui,
   output reg cpu_halt,
-  output reg is_auipc
+  output reg is_auipc,
+
 );
 
   initial begin
@@ -51,6 +52,40 @@ always @(*) begin //Anytime the input signal changes
           cpu_halt = 1;
               $display("ebreak");
         end
+      endcase
+      case(instr[14:12])
+        3'b001 : begin      //CSRRW
+          rs1 = instr[19:15];
+          rd = instr[11:7];
+          csr_func = instr[14:12];
+        end
+        3'b010 : begin      //CSRRS
+          rs1 = instr[19:15];
+          csr_func = instr[14:12];
+        end
+        3'b011 : begin      //CSRRC
+          rs1 = instr[19:15];
+          rd = instr[11:7];
+          csr_func = instr[14:12];
+        end
+        3'b100 : begin      //CSRRWI
+          rs1 = instr[19:15];
+          rd = instr[11:7];
+          imm = instr[31:20];
+          csr_func = instr[14:12];
+        end
+        3'b101 : begin      //CSRRSI
+          rs1 = instr[19:15];
+          csr_func = instr[14:12];
+          imm = instr[31:20];
+        end
+        3'b110 : begin      //CSRRCI
+          rs1 = instr[19:15];
+          rd = instr[11:7];
+          imm = instr[31:20];
+          csr_func = instr[14:12];
+        end
+
       endcase
     end
 

@@ -10,9 +10,35 @@ module top(
   wire gpio1_irq;
   wire ext_iqr = gpio0_irq || gpio1_igpio1_irqnter;
 
+  //Traps
+  wire is_trap;
+  wire trap_illegal_instr;
+  wire trap_csr_access_violation;
+  wire trap_instr_addr_misaligned;
+  wire trap_load_store_misaligned;
+  assign is_trap = trap_illegal_instr | trap_csr_access_violation
+                                      | trap_instr_addr_misaligned
+                                      | trap_load_store_misaligned;
+
+  reg [31:0] mcause_id;
+  always @(*) begin
+    case(1'b1)
+      trap_illegal_instr         : mcause_id = 32'd1;
+      trap_csr_access_violation  : mcause_id = 32'd2;
+      trap_instr_addr_misaligned : mcause_id = 32'd3;
+      trap_load_store_misaligned : mcause_id = 32'd4;
+      default : mcause_id 32'd0;
+    endcase
+  end
+
+
   //Hazards
   wire stall;
   wire flush;
+  wire flush_jump;
+  wire flush_trap;
+  assign flush = flush_jump | flush_trap;
+
   wire cpu_halt;
   //IFID Pipline Registers
   reg [31:0] IF_ID_instr;
@@ -38,7 +64,8 @@ module top(
     .if_instruction(IF_ID_instr_wire),
     .pc_target(pc_target),
     .pc_out(pc_out_wire),
-    .pc(IF_ID_wire)
+    .pc(IF_ID_wire),
+    .pc_trap(trap_instr_addr_misaligned)
   );
 
   always @(posedge clk) begin //Handle flush and stalling
@@ -252,13 +279,17 @@ module top(
     .ex_mem_result_reg(ex_mem_result_reg),
     .mem_wb_result_reg(mem_wb_result_reg),
     .mem_wb_write_reg(mem_wb_write_reg),
+    .load_type(id_ex_load_type_reg),
+    .store_type(id_ex_store_type_reg),
+    .is_load(id_ex_is_load_reg),
+    .is_store(id_ex_is_store_reg),
     .ex_result(id_ex_result_w),
-    .flush(flush),
+    .flush(flush_jump),
     .ex_pc_target(pc_target),      // Feed this back to fetch!
     .ex_ram_address(ex_ram_address_w),
     .divider_busy(div_busy_w),
     .divider_finished_comb(divider_finished_w)
-
+    .misaligned(trap_load_store_misaligned)
 );
 assign pc_src = flush;
 
@@ -334,5 +365,19 @@ end
   //**-----------------------**//
 
 
+
+
+
+//**     Control System Registers     **//
+
+csr csr_module(
+  .clk(clk),
+  .reset(reset),
+  .current_privilege(privilege),
+
+
+
+
+);
 
 endmodule

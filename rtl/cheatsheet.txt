@@ -1,3 +1,22 @@
+TRAP CAUSES
+  if bit 31 == 0 synchronous, if bit 31 == 1 asynchronous (interrupt)
+
+  1 : illegal instructions
+  2 : CSR access violation
+  3 : Instruction address misaligned
+  4 : Load/Store misaligned
+
+
+
+
+
+
+
+
+
+
+
+
 rd  : destination
 rs1 : source register
 rs2 : immediate

@@ -71,9 +71,9 @@ always @(posedge clk) begin
       3'b100: //LOAD BYTE (U)
          case(ram_address[1:0])
           2'b00: data_out <= {24'b0, current_word[7:0]};
-          2'b01: data_out <= {{24{current_word[0]}}, current_word[15:8]};
-          2'b10: data_out <= {{24{current_word[0]}}, current_word[23:16]};
-          2'b11: data_out <= {{24{current_word[0]}}, current_word[31:24]};
+          2'b01: data_out <= {24'b0, current_word[15:8]};
+          2'b10: data_out <= {24'b0, current_word[23:16]};
+          2'b11: data_out <= {24'b0, current_word[31:24]};
         endcase
       3'b101: //LOAD HALF (U)
           case(ram_address[1])

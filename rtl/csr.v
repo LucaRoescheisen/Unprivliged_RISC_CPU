@@ -8,18 +8,23 @@ module csr(
  input csr_write_enable,
 //Trap Handling
 
- input        is_trap,
+ input        trap_sources,
  input [31:0] trap_instr_pc,
-  input [31:0] trap_cause,
+ input [31:0] trap_cause,
 //Interrupt Handling
 input extr_iqr;
 input [31:0] current_pc;
 
-
+//minstret input
+input instr_correctly_executed, //NOTE :: REMEBER KEEP LOW FOR STALLS
+ output trap_csr_violation;
  output [31:0] csr_r_data,
  output [31:0] next_pc
  output flush_from_interrupt
 );
+localparam NO_PRIV 1;
+
+
 
 //MVENDORID : 0xF11
 reg [31:0] mvendorid;
@@ -102,30 +107,85 @@ wire is_mret; //(instr == 32'h30200073);
 
 //MTVEC : 0x305 MRW
 reg [31:0] mtvec;
+//Location of trap handler
+
 
 //MEPC : 0x341 MRW
 reg [31:0] mepc;
+//Stored location of line of code that caused the trap
 
 //MCAUSE : 0x342 MRW
 reg [31:0] mcause;
 
 //MSCRATCH : 0x340 MRW
 reg [31:0] mscratch;
+/*
+  A temporary storage for trap handler, where you can save something like the stack pointer
+  It is handled in software.
+*/
+
 
 //MCYCLE : 0xB00 MRW
-reg [31:0] mcycle;
-
+reg [31:0] MCYCLEH;
+always @(posedge clk) begin
+  if (reset) begin
+    mcycle <= 0;
+  end
+  else if (mcycle ==  32'hffffffff)begin
+    mcycle <= mcycle;
+  end else begin
+    mcycle <= mcycle + 1;
+  end
+end
 //MCYCLEH : 0xB80 MRW
 reg [31:0] mcycleh;
+always @(posedge clk) begin
+  if(reset) begin
+    mcycleh <= 0;
+  end
+  else if (mcycle ==  32'hffffffff)begin
+    mcycleh <= mcycleh + 1;
+  end else begin
+    mcycleh <= mcycleh;
+  end
+
+end
+
+
 
 //MINSTRET : 0xB02 MRW
 reg [31:0] minstret;
+always @(posedge clk) begin
+  if(reset) begin
+    minstret <= 0;
+  end
+  else if (instr_correctly_executed && minstret != 32'hffffffff)begin
+    minstret <= minstret + 1;
+  end else begin
+    minstret <= minstret;
+  end
+
+end
+//counts number of instructions executed by cpu
+
+
 
 //MINSTRETH : 0xB82 MRW
 reg [31:0] minstreth;
+always @(posedge clk) begin
+  if(reset) begin
+    minstreth <= 0;
+  end
+  else if (instr_correctly_executed && minstret ==  32'hffffffff)begin
+    minstreth <= minstreth + 1;
+  end else begin
+    minstreth <= minstreth;
+  end
 
+end
+//counts number of instructions executed by cpu
 
-
+wire is_trap = trap_sources;
 wire take_interrupt = mstatus[3] && mie[11] && mip[11]; //global enabled && source enable && source pending
 always @(posedge clk or posedge reset) begin
   if(reset) begin
@@ -134,14 +194,14 @@ always @(posedge clk or posedge reset) begin
   end
   else if(is_trap) begin
     mepc <= trap_instr_pc;
-    mcause <= trap_cause;
+    mcause <= {1'b0, trap_cause[30:0]};
     mstatus[`MPP_HIGH:`MPP_LOW] <= current_privilege; // saves old current_privilege
     current_privilege <= 1'b11 //swtich to machine mode to give OS highest current_privilege to access CSRs
     mstatus[`MIE] <=  1'b0; //disables interrupts
     next_pc <= mtvec; //mtvec is declared from  the Trap Handler in OS
   end
   else if (take_interrupt) begin//Interrupts are enabled!
-    mcause <= {1'b1, 30'b0, 1'b1};                     //Machine interrupt
+    mcause <= {1'b1, trap_cause[30:0]};                     //Machine interrupt
     mepc <= current_pc + 4;
     mcause <= current_pc + 4;
 
@@ -156,13 +216,13 @@ always @(posedge clk or posedge reset) begin
   else if (is_mret) begin            //Interrupt Handled
     next_privilege <= mstatus[`MPP_HIGH:`MPP_LOW];
     mstatus[`MIE] <= mstatus[`MPIE]; //Save the previous interrupt bit
-    mstatus[MPIE] <= 1'b1;           //Enable interrupts
+    mstatus[`MPIE] <= 1'b1;           //Enable interrupts
     next_pc <= mpec;                 //Move program counter to position specified by the trap handler
     flush_from_interrupt <= 1;       //Flush pipeline
   end
   else begin
     if(csr_write_enable) begin
-      if(current_privilege == 2'b11) begin
+      if(current_privilege == 2'b11) begin //Make sure we are in machine mode for read and write operations
          csr_r_data <= mstatus;
         case(csr_addr)
           12'h300: begin //MSTATUS
@@ -175,29 +235,30 @@ always @(posedge clk or posedge reset) begin
               3'b110: mstatus <= ~csr_imm & csr_w_data; //CSRRCI
             endcase
           end
-            12'h300: begin //TEST
+            12'h305: begin //MTVEC
             case(csr_func)
-              3'b001: mstatus <= csr_w_data;//CSSRW Atomic read-write
-              3'b010: mstatus <= csr_w_data | mstatus;//CSSRS
-              3'b011: mstatus <= ~csr_w_data & mstatus;//CSSRC
-              3'b100: mstatus <= csr_imm;//CSSRWI
-              3'b101: mstatus <= csr_imm | csr_w_data;//CSSRI
-              3'b110: mstatus <= ~csr_imm & csr_w_data; //CSRRCI
+              3'b001: mtvec <= csr_w_data;//CSSRW Atomic read-write
+              3'b010: mtvec <= csr_w_data | mtvec;//CSSRS
+              3'b011: mtvec <= ~csr_w_data & mtvec;//CSSRC
+              3'b100: mtvec <= csr_imm;//CSSRWI
+              3'b101: mtvec <= csr_imm | csr_w_data;//CSSRI
+              3'b110: mtvec <= ~csr_imm & csr_w_data; //CSRRCI
             endcase
           end
-          12'h305: begin //MTVEC
+          12'h305: begin //MSCRATCH
             case(csr_func)
-              3'b001: begin
-                mtvec <= csr_w_data;
-                csr_r_data <= mtvec;
-              end
+              3'b001: mscratch <= csr_w_data;//CSSRW Atomic read-write
+              3'b010: mscratch <= csr_w_data | mscratch;//CSSRS
+              3'b011: mscratch <= ~csr_w_data & mscratch;//CSSRC
+              3'b100: mscratch <= csr_imm;//CSSRWI
+              3'b101: mscratch <= csr_imm | csr_w_data;//CSSRI
+              3'b110: mscratch <= ~csr_imm & csr_w_data; //CSRRCI
             endcase
           end
         endcase
       end
       else begin
-        take_trap <= 1;
-        trap_cause <= ILLEGAL_INSTR;
+        trap_csr_violation <= 1;
         trap_pc <= current_pc;
       end
     end
