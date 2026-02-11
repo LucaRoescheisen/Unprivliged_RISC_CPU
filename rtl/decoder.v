@@ -22,7 +22,7 @@ module decoder(
   output reg is_lui,
   output reg cpu_halt,
   output reg is_auipc,
-  output reg csr_func
+  output reg [2:0] csr_func
 );
 
   initial begin
@@ -52,6 +52,7 @@ always @(*) begin //Anytime the input signal changes
           cpu_halt = 1;
               $display("ebreak");
         end
+        default: cpu_halt = 0;
       endcase
       case(instr[14:12])
         3'b001 : begin      //CSRRW
@@ -71,25 +72,26 @@ always @(*) begin //Anytime the input signal changes
         3'b100 : begin      //CSRRWI
           rs1 = instr[19:15];
           rd = instr[11:7];
-          imm = instr[31:20];
+          imm = {{20{instr[31]}}, instr[31:20]};;
           csr_func = instr[14:12];
         end
         3'b101 : begin      //CSRRSI
           rs1 = instr[19:15];
           csr_func = instr[14:12];
-          imm = instr[31:20];
+          imm = {{20{instr[31]}}, instr[31:20]};;
         end
         3'b110 : begin      //CSRRCI
           rs1 = instr[19:15];
           rd = instr[11:7];
-          imm = instr[31:20];
+          imm = {{20{instr[31]}}, instr[31:20]};;
           csr_func = instr[14:12];
         end
-
+        default : begin
+        end
       endcase
     end
 
-    7'b0110111: begin //AUIPC
+    7'b0010111: begin //AUIPC
       rd = instr[11:7];
       imm = {instr[31:12], 12'b0};
       reg_write = 1'b1;
@@ -132,7 +134,7 @@ always @(*) begin //Anytime the input signal changes
     end
     7'b1101111: begin  //J-Type format : JAL
       rd = instr[11:7];
-      imm = { {11{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0 };
+      imm = { {12{instr[31]}}, instr[19:12], instr[20], instr[30:21], 1'b0 };
       jal_jump = 1'b1;
       reg_write = 1;
       decoder_illegal = 0;
@@ -182,7 +184,7 @@ always @(*) begin //Anytime the input signal changes
       jalr_jump = 1'b0;
       rs1 = 5'bx;
       rs2 = 5'bx;
-      imm = 31'bx;
+      imm = 32'bx;
       is_load = 1'b0;
       load_type = 3'bx;
       decoder_illegal = 1;
@@ -197,6 +199,7 @@ always @(*) begin //Anytime the input signal changes
             7'b0000000: alu_op = 5'b00000; //ADD
             7'b0100000: alu_op = 5'b00001; //SUB
             7'b0000001: alu_op = 5'b10011;  //MUL
+            default : alu_op = 5'bx;
           endcase
         end
         3'b100 :  begin
@@ -207,7 +210,9 @@ always @(*) begin //Anytime the input signal changes
                 div_start = 1'b1;
                 is_div_instruction = 1'b1;
                 $display("DIV");
+
              end
+             default : alu_op = 5'bx;
           endcase
         end
         3'b110 : begin
@@ -218,7 +223,9 @@ always @(*) begin //Anytime the input signal changes
                 div_start = 1'b1;
                 is_div_instruction = 1'b1;
                  $display("R");
+
              end
+              default : alu_op = 5'bx;
           endcase
         end
 
@@ -232,12 +239,14 @@ always @(*) begin //Anytime the input signal changes
                 is_div_instruction = 1'b1;
                  $display("R U");
              end
+             default : alu_op = 5'bx;
           endcase
         end
         3'b001 : begin
           case(instr[31:25])
             7'b0000000: alu_op = 5'b00101; //LEFT SHIFT LOGICAL
             7'b0000001: alu_op = 5'b10100; //MUL HIGH
+            default : alu_op = 5'bx;
           endcase
         end
         3'b101: begin
@@ -250,18 +259,21 @@ always @(*) begin //Anytime the input signal changes
                 is_div_instruction = 1'b1;
                 $display("DIV U");
              end
+             default : alu_op = 5'bx;
           endcase
         end
         3'b010 : begin
            case(instr[31:25])
              7'b0000000: alu_op = 5'b01000;  //LESS THAN
              7'b0000001: alu_op = 5'b10101; //MUL HIGH (S) (U)
+             default : alu_op = 5'bx;
           endcase
         end
         3'b011 : begin
            case(instr[31:25])
              7'b0000000: alu_op = 5'b01001;  //LESS THAN (U)
              7'b0000001: alu_op = 5'b10110; //MUL HIGH (U)
+             default : alu_op = 5'bx;
           endcase
         end
       endcase
@@ -279,10 +291,12 @@ always @(*) begin //Anytime the input signal changes
           case(imm[11:5])
             7'b0000000 : alu_op = 5'b01111; //SHIFT RIGHT LOGICAL IMMEDIATE
             7'b0100000 : alu_op = 5'b10000; //SHIFT RIGHT ARITHMETIC IMMEDIATE
+            default : alu_op = 5'bx;
           endcase
         end
         3'b010 : alu_op = 5'b10001; // LESS THAN IMMEDIATE
         3'b011 : alu_op = 5'b10010; // LESS THAN IMMEDIATE UNSIGNED
+        default : alu_op = 5'bx;
         endcase
     end
 
@@ -305,6 +319,7 @@ always @(*) begin //Anytime the input signal changes
     7'b0000011: alu_src = 1; // LOAD
     7'b0100011: alu_src = 1; // STORE
     7'b1100011: alu_src = 0;// B-TYPE
+    default: alu_src = 0;
   endcase
 
   end

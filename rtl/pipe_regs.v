@@ -1,10 +1,12 @@
+/* verilator lint_off DECLFILENAME */
+/* verilator lint_off UNUSED */
 module fetch_stage(
     input clk,
     input reset,
     input stall,
     input flush,
     input cpu_halt,
-    input pc_src, //1 If Branch
+    input pc_src, /* verilator lint_off UNUSED */  //1 If Branch
     output [31:0] if_instruction,
     input [31:0] pc_target,
     output [31:0] pc_out,
@@ -26,7 +28,7 @@ module fetch_stage(
   assign pc_trap = (pc[1:0] != 2'b00);
 
   initial begin
-    $readmemh("D:/u_risc/programs/test.hex", instr);
+    $readmemh("programs/test.hex", instr);
   end
 
   always @(posedge clk) begin
@@ -72,7 +74,7 @@ module decode_stage(
   output        id_reg_write_reg,
   output [31:0] id_imm_val,
   output [4:0]  id_alu_op,
-  output [4:0]  id_div_op,
+  output [2:0]  id_div_op,
   output [4:0]  id_rd_addr,
   output [4:0]  id_rs1_addr,
   output [4:0]  id_rs2_addr,
@@ -91,7 +93,8 @@ module decode_stage(
   output        id_div_instruction,
   output        id_is_lui,
   output        cpu_halt,
-  output        is_auipc
+  output        is_auipc,
+  output [2:0]  csr_func
 );
   wire [4:0] rs1_wire;
   wire [4:0] rs2_wire;
@@ -130,7 +133,9 @@ module decode_stage(
     .div_start(id_div_start),
     .is_div_instruction(id_div_instruction),
     .is_lui(id_is_lui),
-    .cpu_halt(cpu_halt)
+    .cpu_halt(cpu_halt),
+    .is_auipc(is_auipc),
+    .csr_func(csr_func)
   );
 
 
@@ -167,7 +172,7 @@ module execute_stage(
   input id_jalr_jump_reg,
 
   input [4:0] id_alu_op_reg,
-  input [3:0] id_div_op_reg,
+  input [2:0] id_div_op_reg,
   input       id_div_instruction,
   input       id_ex_is_lui_reg,
   input        id_ex_is_auipc,
@@ -207,6 +212,7 @@ module execute_stage(
   wire divider_trigger = id_div_instruction && !div_busy && !divider_finished;
 
   wire take_branch;
+  wire ex_jump_branch_taken;
   wire [31:0] target_pc_imm   = id_pc_reg + id_imm_val_reg; // For JAL and Branches
   wire [31:0] target_rs1_imm  = (forward_val_a + id_imm_val_reg) & ~32'h1; //For JALR
   assign ex_jump_branch_taken = id_jal_jump_reg || id_jalr_jump_reg || (id_is_branch_reg && take_branch);
@@ -231,7 +237,6 @@ module execute_stage(
 
   //Result Handling
   assign ex_result = (id_jal_jump_reg || id_jalr_jump_reg) ? id_pc_4_reg:  result;
-  assign ram_address = forward_val_a + id_imm_val_reg;
   wire [31:0] forward_val_a;
   wire [31:0] forward_val_b_inter;
 

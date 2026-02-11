@@ -1,3 +1,5 @@
+/* verilator lint_off UNUSED */
+/* verilator lint_off UNDRIVEN */
 module top(
   input clk,
   input reset
@@ -112,7 +114,7 @@ module top(
   reg        id_ex_reg_write_reg;
   reg [31:0] id_ex_imm_val_reg;
   reg [4:0]  id_ex_alu_op_reg;
-  reg [3:0]  id_ex_div_op_reg;
+  reg [2:0]  id_ex_div_op_reg;
   reg [4:0]  id_ex_rd_addr_reg;
   reg        id_ex_alu_src_reg;
   reg [2:0]  id_ex_branch_type_reg;
@@ -126,7 +128,7 @@ module top(
   reg [2:0]  id_ex_store_type_reg;
   reg        id_ex_div_start_reg;
   reg        id_ex_div_instruction_reg;
-  reg [4:0]  id_ex_is_lui_reg;
+  reg        id_ex_is_lui_reg;
   reg       id_ex_is_auipc;
   //ID-EX Wires
   wire [4:0]  id_rs1_addr_w;
@@ -135,8 +137,8 @@ module top(
   wire [31:0] id_rs2_val_w;
   wire        id_reg_write_w;
   wire [31:0] id_imm_val_w;
-  wire [3:0]  id_alu_op_w;
-  wire [3:0]  id_div_op_w;
+  wire [4:0]  id_alu_op_w;
+  wire [2:0]  id_div_op_w;
   wire [4:0]  id_rd_addr_w;
   wire        id_alu_src_w;
   wire [2:0]  id_branch_type_w;
@@ -152,6 +154,7 @@ module top(
   wire        id_div_instruction_w;
   wire        id_is_lui_w;
   wire        id_is_auipc;
+  wire [2:0]  id_csr_func;
   //**     Decode Stage     **//
   decode_stage decode_stage_mod(
     .clk(clk),
@@ -186,7 +189,8 @@ module top(
     .id_div_instruction(id_div_instruction_w),
     .id_is_lui(id_is_lui_w),
     .cpu_halt(cpu_halt),
-    .is_auipc(id_is_auipc)
+    .is_auipc(id_is_auipc),
+    .csr_func(id_csr_func)
   );
 
   always @(posedge clk) begin
@@ -245,7 +249,7 @@ module top(
   reg [2:0] ex_mem_store_type_reg;
   reg [31:0] ex_mem_rs2_val_reg;
   reg [31:0] ex_mem_ram_address_reg;
-  reg [4:0] ex_mem_is_lui_reg;
+  reg       ex_mem_is_lui_reg;
   //EX-MEM Wires
   wire [31:0] id_ex_result_w;
   wire [31:0] ex_id_pc_target_w;

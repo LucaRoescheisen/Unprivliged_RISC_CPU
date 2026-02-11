@@ -1,7 +1,7 @@
 module regfile(
   input clk,
-  input[3:0] rs1,
-  input[3:0] rs2,
+  input[4:0] rs1,
+  input[4:0] rs2,
   input[4:0] rd,
   input[31:0] result,
   input reg_write,
@@ -18,7 +18,7 @@ x5 : Alternative Link Register (some programs use this instead of x1)
 
 localparam XLEN = 32;
 
-(* dont_touch = "true" *) reg [XLEN-1:0] int_regs [0:32];         //x0 to x32
+(* dont_touch = "true" *) reg [XLEN-1:0] int_regs [0:31];         //x0 to x32
 integer i;
 initial begin
     for (i = 0; i < 32; i = i + 1) begin

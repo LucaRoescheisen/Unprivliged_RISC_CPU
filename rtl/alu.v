@@ -5,9 +5,10 @@ module alu(
 
   output reg [31:0] result
 );
-  wire [63:0] full_product_s_s = $signed(a) * $signed(b);
-  wire [63:0] full_product_s_u = $signed(a) * b;
+  wire [63:0] full_product_s_s = $signed(a) * $signed(b); /* verilator lint_off UNUSED */
+  wire [63:0] full_product_s_u = $signed(a) * b; /* verilator lint_off UNUSED */
   wire [63:0] full_product_u_u = a * b;
+
 
 always @(*) begin //Process OPCODES
   case(alu_op)
