@@ -15,9 +15,8 @@ riscv64-unknown-elf-objcopy -O verilog -j .text --verilog-data-width=4 --reverse
 
 
  //WSL
-verilator -Wall -Wno-fatal --cc rtl/*.v --exe ../tb.cpp --trace -top-module top --Mdir ./sim/obj_dir
-make -C sim/obj_dir -j -f Vtop.mk Vtop
-./obj_dir/Vtop
+verilator -Wall -Wno-fatal --cc rtl/*.v --exe ../tb.cpp --trace -top-module top_verilator --Mdir ./sim/obj_dir
+make -C sim/obj_dir -j -f Vtop_verilator.mk Vtop_verilator
+./sim/obj_dir/Vtop_verilator
 
 
-Note: Make sure to /*verilator public*/ on any variables that the tb needs
