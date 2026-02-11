@@ -12,17 +12,18 @@ module csr(
  input [31:0] trap_instr_pc,
  input [31:0] trap_cause,
 //Interrupt Handling
-input extr_iqr;
-input [31:0] current_pc;
+input extr_iqr,
+input [31:0] current_pc,
 
 //minstret input
 input instr_correctly_executed, //NOTE :: REMEBER KEEP LOW FOR STALLS
- output trap_csr_violation;
- output [31:0] csr_r_data,
- output [31:0] next_pc
- output flush_from_interrupt
+ output reg trap_csr_violation,
+ output reg [31:0] csr_r_data,
+ output reg [31:0] next_pc,
+ output reg flush_from_interrupt,
+ output reg [1:0] next_privilege
 );
-localparam NO_PRIV 1;
+localparam NO_PRIV = 1;
 
 
 
@@ -56,10 +57,10 @@ end
 
 //mstatus: 0x300
 reg [31:0] mstatus = 32'b0;
-localparam MIE 3,
-           MPIE 7,
-           MPP_LOW 11,
-           MPP_HIGH 12;
+localparam MIE = 3,
+           MPIE = 7,
+           MPP_LOW = 11,
+           MPP_HIGH = 12;
 /*
   Tracks CPU privilege and interrupt state
   BIT 3     : MIE  : Machine Interrupt Enable
@@ -126,7 +127,7 @@ reg [31:0] mscratch;
 
 
 //MCYCLE : 0xB00 MRW
-reg [31:0] MCYCLEH;
+reg [31:0] mcycle;
 always @(posedge clk) begin
   if (reset) begin
     mcycle <= 0;
@@ -195,9 +196,9 @@ always @(posedge clk or posedge reset) begin
   else if(is_trap) begin
     mepc <= trap_instr_pc;
     mcause <= {1'b0, trap_cause[30:0]};
-    mstatus[`MPP_HIGH:`MPP_LOW] <= current_privilege; // saves old current_privilege
-    current_privilege <= 1'b11 //swtich to machine mode to give OS highest current_privilege to access CSRs
-    mstatus[`MIE] <=  1'b0; //disables interrupts
+    mstatus[MPP_HIGH:MPP_LOW] <= current_privilege; // saves old current_privilege
+    next_privilege <= 2'b11; //swtich to machine mode to give OS highest current_privilege to access CSRs
+    mstatus[MIE] <=  1'b0; //disables interrupts
     next_pc <= mtvec; //mtvec is declared from  the Trap Handler in OS
   end
   else if (take_interrupt) begin//Interrupts are enabled!
@@ -205,19 +206,19 @@ always @(posedge clk or posedge reset) begin
     mepc <= current_pc + 4;
     mcause <= current_pc + 4;
 
-    mstatus[`MPP_HIGH:`MPP_LOW]  <= current_privilege;
-    mstatus[`MPIE] <=  mstatus[`MIE];
-    mstatus[`MIE] <=  1'b0;
-    next_privilege <= 1'b11; //Machine
+    mstatus[MPP_HIGH:MPP_LOW]  <= current_privilege;
+    mstatus[MPIE] <=  mstatus[MIE];
+    mstatus[MIE] <=  1'b0;
+    next_privilege <= 2'b11; //Machine
     next_pc <= mtvec;
     flush_from_interrupt <= 1;
 
   end
   else if (is_mret) begin            //Interrupt Handled
-    next_privilege <= mstatus[`MPP_HIGH:`MPP_LOW];
-    mstatus[`MIE] <= mstatus[`MPIE]; //Save the previous interrupt bit
-    mstatus[`MPIE] <= 1'b1;           //Enable interrupts
-    next_pc <= mpec;                 //Move program counter to position specified by the trap handler
+    next_privilege <= mstatus[MPP_HIGH:MPP_LOW];
+    mstatus[MIE] <= mstatus[MPIE]; //Save the previous interrupt bit
+    mstatus[MPIE] <= 1'b1;           //Enable interrupts
+    next_pc <= mepc;                 //Move program counter to position specified by the trap handler
     flush_from_interrupt <= 1;       //Flush pipeline
   end
   else begin
@@ -233,6 +234,7 @@ always @(posedge clk or posedge reset) begin
               3'b100: mstatus <= csr_imm;//CSSRWI
               3'b101: mstatus <= csr_imm | csr_w_data;//CSSRI
               3'b110: mstatus <= ~csr_imm & csr_w_data; //CSRRCI
+              default : mstatus =mstatus;
             endcase
           end
             12'h305: begin //MTVEC
@@ -243,9 +245,10 @@ always @(posedge clk or posedge reset) begin
               3'b100: mtvec <= csr_imm;//CSSRWI
               3'b101: mtvec <= csr_imm | csr_w_data;//CSSRI
               3'b110: mtvec <= ~csr_imm & csr_w_data; //CSRRCI
+              default : mtvec = mtvec;
             endcase
           end
-          12'h305: begin //MSCRATCH
+          12'h340: begin //MSCRATCH
             case(csr_func)
               3'b001: mscratch <= csr_w_data;//CSSRW Atomic read-write
               3'b010: mscratch <= csr_w_data | mscratch;//CSSRS
@@ -253,6 +256,7 @@ always @(posedge clk or posedge reset) begin
               3'b100: mscratch <= csr_imm;//CSSRWI
               3'b101: mscratch <= csr_imm | csr_w_data;//CSSRI
               3'b110: mscratch <= ~csr_imm & csr_w_data; //CSRRCI
+              default : mscratch =32'b0;
             endcase
           end
         endcase

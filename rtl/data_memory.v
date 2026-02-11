@@ -1,3 +1,4 @@
+/* verilator lint_off UNUSED */
 module data_memory(
   input clk,
   input [2:0] load_type,
@@ -43,6 +44,8 @@ always @(posedge clk) begin
             3'b010: begin // STORE WORD
                 ram[ram_address[11:2]] <= data_in;
             end
+            default: begin
+            end
         endcase
     end
 end
@@ -80,6 +83,8 @@ always @(posedge clk) begin
             1'b0: data_out <= {{16{current_word[0]}} , current_word[15:0]};
             1'b1: data_out <= {{16{current_word[0]}}, current_word[31:16]};
           endcase
+      default: begin
+            end
 
     endcase
 

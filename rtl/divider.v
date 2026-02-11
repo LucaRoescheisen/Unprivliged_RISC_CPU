@@ -1,3 +1,4 @@
+/* verilator lint_off UNUSED */
 module divider(
   input clk,
   input [31:0] divisor, //top
@@ -40,13 +41,12 @@ wire [32:0] sub_trial = {1'b0, shifted_space[63:32]} - {1'b0, useable_divisor}; 
 
 always @(*) begin
   if(divisor == 0) begin
-    $display("WOOWOWOWOW");
         case (div_op)
-
           3'b100: result = 32'hFFFFFFFF;    // DIV (signed -1)
           3'b101: result = 32'hFFFFFFFF;    // DIVU (unsigned max)
           3'b110: result = dividend;        // REM
           3'b111: result = dividend;        // REMU
+          default : result = 32'b0;
         endcase
   end else begin
   case (div_op)
