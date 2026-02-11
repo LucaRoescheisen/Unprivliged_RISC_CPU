@@ -45,10 +45,5 @@ always @(*) begin //Process OPCODES
     result = 32'bx;
 
   endcase
-
-
 end
-
-
-
 endmodule

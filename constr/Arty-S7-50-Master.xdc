@@ -171,7 +171,7 @@ create_clock -add -name sys_clk_pin -period 10.000 -waveform {0 5.000}  [get_por
 
 ## Misc. ChipKit Ports
 #set_property -dict { PACKAGE_PIN K13   IOSTANDARD LVCMOS33 } [get_ports { ck_ioa }]; #IO_25_15 Sch=ck_ioa
-#set_property -dict { PACKAGE_PIN C18   IOSTANDARD LVCMOS33 } [get_ports { ck_rst }]; #IO_L11N_T1_SRCC_15
+set_property -dict { PACKAGE_PIN C18   IOSTANDARD LVCMOS33 } [get_ports { reset }]; #IO_L11N_T1_SRCC_15
 
 ## Quad SPI Flash
 ## Note: the SCK clock signal can be driven using the STARTUPE2 primitive

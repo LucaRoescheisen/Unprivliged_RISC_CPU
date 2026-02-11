@@ -8,7 +8,7 @@ module top(
   //Interrupt //should be inputs
   wire gpio0_irq;
   wire gpio1_irq;
-  wire ext_iqr = gpio0_irq || gpio1_igpio1_irqnter;
+  wire ext_iqr = gpio0_irq || gpio1_irq;
 
   //Traps
   wire is_trap;
@@ -27,7 +27,7 @@ module top(
       trap_csr_access_violation  : mcause_id = 32'd2;
       trap_instr_addr_misaligned : mcause_id = 32'd3;
       trap_load_store_misaligned : mcause_id = 32'd4;
-      default : mcause_id 32'd0;
+      default : mcause_id = 32'd0;
     endcase
   end
 
@@ -256,8 +256,8 @@ module top(
   execute_stage execute_stage_module(
     .clk(clk),
     .reset(reset),
-    .id_pc_reg(id_ex_pc_reg),              // Matches your reg name
-    .id_pc_4_reg(id_ex_pc_reg_plus_4_reg),     // Matches your reg name
+    .id_pc_reg(id_ex_pc_reg),
+    .id_pc_4_reg(id_ex_pc_reg_plus_4_reg),
     .id_rs1_val_reg(id_ex_rs1_val_reg),
     .id_rs2_val_reg(id_ex_rs2_val_reg),
     .id_imm_val_reg(id_ex_imm_val_reg),
@@ -285,10 +285,10 @@ module top(
     .is_store(id_ex_is_store_reg),
     .ex_result(id_ex_result_w),
     .flush(flush_jump),
-    .ex_pc_target(pc_target),      // Feed this back to fetch!
+    .ex_pc_target(pc_target),      // Feed this back to fetch
     .ex_ram_address(ex_ram_address_w),
     .divider_busy(div_busy_w),
-    .divider_finished_comb(divider_finished_w)
+    .divider_finished_comb(divider_finished_w),
     .misaligned(trap_load_store_misaligned)
 );
 assign pc_src = flush;
@@ -369,7 +369,7 @@ end
 
 
 //**     Control System Registers     **//
-
+/*
 csr csr_module(
   .clk(clk),
   .reset(reset),
@@ -378,6 +378,6 @@ csr csr_module(
 
 
 
-);
+);*/
 
 endmodule

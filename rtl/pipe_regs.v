@@ -170,7 +170,7 @@ module execute_stage(
   input [3:0] id_div_op_reg,
   input       id_div_instruction,
   input       id_ex_is_lui_reg,
-  input        id_ex_is_auipc
+  input        id_ex_is_auipc,
 //Forwarding Values:
   input        ex_mem_reg_write_reg,
   input [4:0]  ex_mem_rd,
@@ -184,7 +184,7 @@ module execute_stage(
   input [2:0] load_type,
   input [2:0] store_type,
   input is_load,
-  input is store,
+  input is_store,
   // Outputs to EX/MEM Register
   output [31:0] ex_result,
   output        flush,
@@ -193,7 +193,7 @@ module execute_stage(
   //Control
   output divider_busy,
   output divider_finished_comb,
-  output reg misaligned;
+  output reg misaligned
 );
 
   wire [31:0] div_result, alu_result;

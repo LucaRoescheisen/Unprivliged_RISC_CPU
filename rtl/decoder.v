@@ -22,7 +22,7 @@ module decoder(
   output reg is_lui,
   output reg cpu_halt,
   output reg is_auipc,
-
+  output reg csr_func
 );
 
   initial begin
