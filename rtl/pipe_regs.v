@@ -94,7 +94,8 @@ module decode_stage(
   output        id_is_lui,
   output        cpu_halt,
   output        is_auipc,
-  output [2:0]  csr_func
+  output [2:0]  csr_func,
+  output         wrote_to_regfile
 );
   wire [4:0] rs1_wire;
   wire [4:0] rs2_wire;
@@ -148,7 +149,8 @@ module decode_stage(
     .result(wb_final_data),
     .reg_write(wb_reg_write),
     .rs1_val(id_rs1_val),
-    .rs2_val(id_rs2_val)
+    .rs2_val(id_rs2_val),
+    .wrote_to_regfile(wrote_to_regfile)
   );
 
 endmodule

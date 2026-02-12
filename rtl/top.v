@@ -5,7 +5,13 @@ module top(
   input reset
 );
   //Privilege
-  reg [1:0] privilege = 2'b11; //starts at machine priv
+  reg [1:0] privilege; //starts at machine priv
+
+  always @(posedge clk) begin
+    if(reset) privilege <= 2'b11;
+    else      privilege <= next_privilege;
+
+  end
 
   //Interrupt //should be inputs
   wire gpio0_irq;
@@ -34,12 +40,13 @@ module top(
   end
 
 
+
   //Hazards
   wire stall;
   wire flush;
   wire flush_jump;
   wire flush_trap;
-  assign flush = flush_jump | flush_trap;
+  assign flush = flush_jump | flush_trap | flush_from_interrupt;
 
   wire cpu_halt;
   //IFID Pipline Registers
@@ -129,7 +136,9 @@ module top(
   reg        id_ex_div_start_reg;
   reg        id_ex_div_instruction_reg;
   reg        id_ex_is_lui_reg;
-  reg       id_ex_is_auipc;
+  reg        id_ex_is_auipc;
+  reg [2:0]  id_ex_csr_func_reg;
+  reg       id_ex_ csr_write_enable_reg;
   //ID-EX Wires
   wire [4:0]  id_rs1_addr_w;
   wire [4:0]  id_rs2_addr_w;
@@ -154,7 +163,9 @@ module top(
   wire        id_div_instruction_w;
   wire        id_is_lui_w;
   wire        id_is_auipc;
-  wire [2:0]  id_csr_func;
+  wire [2:0]  id_csr_func_w;
+  wire        id_ex_csr_write_enable_w;
+  wire        wrote_to_regfile;
   //**     Decode Stage     **//
   decode_stage decode_stage_mod(
     .clk(clk),
@@ -190,7 +201,9 @@ module top(
     .id_is_lui(id_is_lui_w),
     .cpu_halt(cpu_halt),
     .is_auipc(id_is_auipc),
-    .csr_func(id_csr_func)
+    .csr_func(id_csr_func),
+    .csr_write_enable(id_ex_csr_write_enable_w),
+    .wrote_to_regfile(wrote_to_regfile)
   );
 
   always @(posedge clk) begin
@@ -230,6 +243,8 @@ module top(
       id_rs1_addr_reg <=id_rs1_addr_w;
       id_rs2_addr_reg <=id_rs2_addr_w;
       id_ex_is_auipc <= id_is_auipc;
+      id_ex_csr_func_reg  <= csr_func_w;
+      id_ex_csr_write_enable_reg <= id_ex_csr_write_enable_w
     end
 
   end
@@ -250,6 +265,7 @@ module top(
   reg [31:0] ex_mem_rs2_val_reg;
   reg [31:0] ex_mem_ram_address_reg;
   reg       ex_mem_is_lui_reg;
+  reg       ex_mem_csr_write_enable_reg;
   //EX-MEM Wires
   wire [31:0] id_ex_result_w;
   wire [31:0] ex_id_pc_target_w;
@@ -316,6 +332,7 @@ assign pc_src = flush;
       ex_mem_rs2_val_reg <=  id_ex_rs2_val_reg;
       ex_mem_ram_address_reg <= ex_ram_address_w;
       ex_mem_is_lui_reg  <= id_ex_is_lui_reg;
+      ex_mem_csr_write_enable_reg <= id_ex_csr_write_enable_reg
     end
 
  end
@@ -323,6 +340,7 @@ assign pc_src = flush;
     //**-----------------------**//
 
   wire mem_busy_w;
+  wire wrote_to_ram;
   wire [31:0] mem_data_out_w;
   reg [4:0] d_mem_wb_rd_reg;
   reg [31:0] d_mem_wb_result_reg;
@@ -339,7 +357,8 @@ assign pc_src = flush;
     .ram_address(ex_mem_ram_address_reg),
     .data_in(ex_mem_rs2_val_reg),
     .data_out(mem_data_out_w),
-    .mem_busy(mem_busy_w)
+    .mem_busy(mem_busy_w),
+    .wrote_to_ram(wrote_to_ram)
 );
   wire early_stall = id_ex_div_instruction_reg && !div_busy_w && !divider_finished_w;
   wire normal_stall = div_busy_w;
@@ -359,7 +378,7 @@ assign pc_src = flush;
     else if(!stall) begin
 
         mem_wb_rd_reg      <= ex_mem_rd_addr_reg;  // The destination
-        mem_wb_result_reg  <= ex_mem_result_reg;   // The ALU result
+        mem_wb_result_reg  <= ex_mem_csr_write_enable_reg ? csr_r_data : ex_mem_result_reg;   // The ALU result or CSR value
         mem_wb_write_reg   <= ex_mem_reg_write_reg;
         mem_wb_is_load_reg <= ex_mem_is_load_reg;  // The Mux selector
         mem_data_out_reg   <= mem_data_out_w;
@@ -368,20 +387,31 @@ end
 
   //**-----------------------**//
 
-
+wire instr_correctly_executed = wrote_to_regfile | wrote_to_ram; //Instruction was executed
 
 
 
 //**     Control System Registers     **//
-/*
-csr csr_module(
+
+csr csr_module( //id_ex stage
   .clk(clk),
   .reset(reset),
   .current_privilege(privilege),
-
-
-
-
-);*/
+  .csr_addr(id_ex_rd_addr_reg),
+  .csr_func(id_ex_csr_func_reg),
+  .csr_w_data(id_ex_rs1_val_reg),
+  .csr_write_enable(id_ex_csr_write_enable_reg),
+  .trap_sources(is_trap),
+  .trap_instr_pc(id_ex_pc_reg),
+  .trap_cause(mcause_id),
+  .extr_iqr(ext_iqr),
+  .current_pc(IF_ID_pc),
+  .instr_correctly_executed(instr_correctly_executed),
+  .trap_csr_violation(trap_csr_access_violation),
+  .csr_r_data(csr_r_data),
+  .flush_from_interrupt(flush_from_interrupt),
+  .next_privilege(next_privilege),
+  .flush_trap(flush_trap)
+);
 
 endmodule

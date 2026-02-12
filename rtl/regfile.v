@@ -6,7 +6,8 @@ module regfile(
   input[31:0] result,
   input reg_write,
   output  [31:0] rs1_val,
-  output  [31:0] rs2_val
+  output  [31:0] rs2_val,
+  output reg     wrote_to_regfile
 );
 /*
 x1 : Return Address Register never write to THIS!!!!!
@@ -33,6 +34,7 @@ assign rs2_val = (rs2 == rd && reg_write && rs2 != 0) ? result : int_regs[rs2];
 always @(posedge clk) begin
   if (reg_write && rd != 0) begin
     int_regs[rd] <= result;
+    wrote_to_regfile <= 1;
   end
 
 end

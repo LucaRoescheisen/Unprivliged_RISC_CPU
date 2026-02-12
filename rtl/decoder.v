@@ -22,7 +22,8 @@ module decoder(
   output reg is_lui,
   output reg cpu_halt,
   output reg is_auipc,
-  output reg [2:0] csr_func
+  output reg [2:0] csr_func,
+  output reg csr_write_enable
 );
 
   initial begin
@@ -39,7 +40,7 @@ always @(*) begin //Anytime the input signal changes
   is_load = 0;load_type = 0;
   is_store = 0; decoder_illegal = 0;
   store_type= 0; div_start = 0; is_div_instruction = 0;
-  is_lui = 0; is_auipc = 0;
+  is_lui = 0; is_auipc = 0; csr_write_enable = 0;
   case(instr[6:0])     //Identify OP code
     7'b1110011: begin  //E-CALL E-BREAK
       case(instr[31:20])
@@ -59,34 +60,48 @@ always @(*) begin //Anytime the input signal changes
           rs1 = instr[19:15];
           rd = instr[11:7];
           csr_func = instr[14:12];
+          csr_write_enable = 1;
+          reg_write = 1;
         end
         3'b010 : begin      //CSRRS
           rs1 = instr[19:15];
           csr_func = instr[14:12];
+          csr_write_enable = 1;
+          reg_write = 1;
         end
         3'b011 : begin      //CSRRC
           rs1 = instr[19:15];
           rd = instr[11:7];
           csr_func = instr[14:12];
+          csr_write_enable = 1;
+          reg_write = 1;
         end
         3'b100 : begin      //CSRRWI
           rs1 = instr[19:15];
           rd = instr[11:7];
-          imm = {{20{instr[31]}}, instr[31:20]};;
+          imm = {{20{instr[31]}}, instr[31:20]};
           csr_func = instr[14:12];
+          csr_write_enable = 1;
+          reg_write = 1;
         end
         3'b101 : begin      //CSRRSI
           rs1 = instr[19:15];
           csr_func = instr[14:12];
-          imm = {{20{instr[31]}}, instr[31:20]};;
+          imm = {{20{instr[31]}}, instr[31:20]};
+          csr_write_enable = 1;
+          reg_write = 1;
         end
         3'b110 : begin      //CSRRCI
           rs1 = instr[19:15];
           rd = instr[11:7];
           imm = {{20{instr[31]}}, instr[31:20]};;
+          csr_write_enable = 1;
           csr_func = instr[14:12];
+          reg_write = 1;
         end
         default : begin
+          csr_write_enable = 0;
+          reg_write = 0;
         end
       endcase
     end

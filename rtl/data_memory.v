@@ -8,7 +8,8 @@ module data_memory(
   input [31:0] ram_address,
   input  [31:0] data_in,
   output reg [31:0] data_out,
-  output reg mem_busy
+  output reg mem_busy,
+  output reg wrote_to_ram
 );
 /*
 addr : [1:0] tells which byte is being accessed (column)
@@ -28,6 +29,7 @@ always @(posedge clk) begin
   if(mem_write_en) begin
         case(store_type)
             3'b000: begin // STORE BYTE
+                wrote_to_ram <= 1;
                 case(ram_address[1:0])
                     2'b00: ram[ram_address[11:2]][7:0]   <= data_in[7:0];
                     2'b01: ram[ram_address[11:2]][15:8]  <= data_in[7:0];
@@ -36,15 +38,18 @@ always @(posedge clk) begin
                 endcase
             end
             3'b001: begin // STORE HALF
+                wrote_to_ram <= 1;
                 case(ram_address[1])
                     1'b0: ram[ram_address[11:2]][15:0]  <= data_in[15:0];
                     1'b1: ram[ram_address[11:2]][31:16] <= data_in[15:0];
                 endcase
             end
             3'b010: begin // STORE WORD
+                wrote_to_ram <= 1;
                 ram[ram_address[11:2]] <= data_in;
             end
             default: begin
+              wrote_to_ram <= 0;
             end
         endcase
     end

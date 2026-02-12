@@ -21,7 +21,8 @@ input instr_correctly_executed, //NOTE :: REMEBER KEEP LOW FOR STALLS
  output reg [31:0] csr_r_data,
  output reg [31:0] next_pc,
  output reg flush_from_interrupt,
- output reg [1:0] next_privilege
+ output reg [1:0] next_privilege,
+ output reg flush_trap
 );
 localparam NO_PRIV = 1;
 
@@ -125,6 +126,13 @@ reg [31:0] mscratch;
   It is handled in software.
 */
 
+//TODO
+/*
+reg [63:0] mtime;
+reg [63:0] mtimecmp;
+wire timer_irq = (mtime >= mtimecmp);
+*/
+
 
 //MCYCLE : 0xB00 MRW
 reg [31:0] mcycle;
@@ -200,8 +208,9 @@ always @(posedge clk or posedge reset) begin
     next_privilege <= 2'b11; //swtich to machine mode to give OS highest current_privilege to access CSRs
     mstatus[MIE] <=  1'b0; //disables interrupts
     next_pc <= mtvec; //mtvec is declared from  the Trap Handler in OS
+    flush_trap <= 1;
   end
-  else if (take_interrupt) begin//Interrupts are enabled!
+  else if (take_interrupt ) begin//Interrupts are enabled!
     mcause <= {1'b1, trap_cause[30:0]};                     //Machine interrupt
     mepc <= current_pc + 4;
     mcause <= current_pc + 4;
@@ -222,6 +231,7 @@ always @(posedge clk or posedge reset) begin
     flush_from_interrupt <= 1;       //Flush pipeline
   end
   else begin
+    flush_trap <= 0;
     if(csr_write_enable) begin
       if(current_privilege == 2'b11) begin //Make sure we are in machine mode for read and write operations
          csr_r_data <= mstatus;
