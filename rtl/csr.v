@@ -3,8 +3,9 @@ module csr(
  input reset,
  input [1:0] current_privilege,
  input [11:0] csr_addr,
- input [3:0] csr_func,
+ input [2:0] csr_func,
  input [31:0] csr_w_data,
+ input [31:0] csr_imm,
  input csr_write_enable,
 //Trap Handling
 
@@ -195,7 +196,7 @@ end
 //counts number of instructions executed by cpu
 
 wire is_trap = trap_sources;
-wire take_interrupt = mstatus[3] && mie[11] && mip[11]; //global enabled && source enable && source pending
+wire take_interrupt = mstatus[3] & mie[11] & mip[11]; //global enabled && source enable && source pending
 always @(posedge clk or posedge reset) begin
   if(reset) begin
     mstatus <= 32'b0;
@@ -242,8 +243,8 @@ always @(posedge clk or posedge reset) begin
               3'b010: mstatus <= csr_w_data | mstatus;//CSSRS
               3'b011: mstatus <= ~csr_w_data & mstatus;//CSSRC
               3'b100: mstatus <= csr_imm;//CSSRWI
-              3'b101: mstatus <= csr_imm | csr_w_data;//CSSRI
-              3'b110: mstatus <= ~csr_imm & csr_w_data; //CSRRCI
+              3'b101: mstatus <= csr_imm | mstatus;//CSSRI
+              3'b110: mstatus <= ~csr_imm & mstatus; //CSRRCI
               default : mstatus =mstatus;
             endcase
           end
@@ -273,7 +274,7 @@ always @(posedge clk or posedge reset) begin
       end
       else begin
         trap_csr_violation <= 1;
-        trap_pc <= current_pc;
+       // trap_pc <= current_pc;
       end
     end
   end

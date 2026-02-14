@@ -6,10 +6,10 @@ module top(
 );
   //Privilege
   reg [1:0] privilege; //starts at machine priv
-
+  wire [1:0] next_privilege;
   always @(posedge clk) begin
     if(reset) privilege <= 2'b11;
-    else      privilege <= next_privilege;
+    else      privilege <= 2'b11;
 
   end
 
@@ -39,16 +39,18 @@ module top(
     endcase
   end
 
-
+  //CSR
+  wire [31:0] csr_r_data;
 
   //Hazards
   wire stall;
   wire flush;
+  wire flush_from_interrupt;
   wire flush_jump;
   wire flush_trap;
   assign flush = flush_jump | flush_trap | flush_from_interrupt;
-
   wire cpu_halt;
+
   //IFID Pipline Registers
   reg [31:0] IF_ID_instr;
   reg [31:0] IF_ID_pc_plus_4;
@@ -138,8 +140,10 @@ module top(
   reg        id_ex_is_lui_reg;
   reg        id_ex_is_auipc;
   reg [2:0]  id_ex_csr_func_reg;
-  reg       id_ex_ csr_write_enable_reg;
+  reg        id_ex_csr_write_enable_reg;
+  reg [11:0] id_ex_csr_addr_reg;
   //ID-EX Wires
+    wire [31:0] mem_data_out_w;
   wire [4:0]  id_rs1_addr_w;
   wire [4:0]  id_rs2_addr_w;
   wire [31:0] id_rs1_val_w;
@@ -166,6 +170,7 @@ module top(
   wire [2:0]  id_csr_func_w;
   wire        id_ex_csr_write_enable_w;
   wire        wrote_to_regfile;
+  wire [11:0] id_ex_csr_addr_w;
   //**     Decode Stage     **//
   decode_stage decode_stage_mod(
     .clk(clk),
@@ -201,9 +206,10 @@ module top(
     .id_is_lui(id_is_lui_w),
     .cpu_halt(cpu_halt),
     .is_auipc(id_is_auipc),
-    .csr_func(id_csr_func),
+    .csr_func(id_csr_func_w),
     .csr_write_enable(id_ex_csr_write_enable_w),
-    .wrote_to_regfile(wrote_to_regfile)
+    .wrote_to_regfile(wrote_to_regfile),
+    .csr_addr(id_ex_csr_addr_w)
   );
 
   always @(posedge clk) begin
@@ -243,8 +249,9 @@ module top(
       id_rs1_addr_reg <=id_rs1_addr_w;
       id_rs2_addr_reg <=id_rs2_addr_w;
       id_ex_is_auipc <= id_is_auipc;
-      id_ex_csr_func_reg  <= csr_func_w;
-      id_ex_csr_write_enable_reg <= id_ex_csr_write_enable_w
+      id_ex_csr_func_reg  <= id_csr_func_w;
+      id_ex_csr_write_enable_reg <= id_ex_csr_write_enable_w;
+      id_ex_csr_addr_reg <= id_ex_csr_addr_w;
     end
 
   end
@@ -266,12 +273,17 @@ module top(
   reg [31:0] ex_mem_ram_address_reg;
   reg       ex_mem_is_lui_reg;
   reg       ex_mem_csr_write_enable_reg;
+  reg [31:0] ex_mem_imm_val_reg;
+  reg [31:0] ex_mem_csr_w_data;
   //EX-MEM Wires
   wire [31:0] id_ex_result_w;
   wire [31:0] ex_id_pc_target_w;
   wire div_busy_w;
   wire divider_finished_w;
   wire [31:0] ex_ram_address_w;
+  reg [11:0] ex_mem_csr_addr_reg;
+  reg [2:0] ex_mem_csr_func_reg;
+  wire [31:0] csr_w_data;
  //**     Execute Stage     **//
   execute_stage execute_stage_module(
     .clk(clk),
@@ -309,7 +321,8 @@ module top(
     .ex_ram_address(ex_ram_address_w),
     .divider_busy(div_busy_w),
     .divider_finished_comb(divider_finished_w),
-    .misaligned(trap_load_store_misaligned)
+    .misaligned(trap_load_store_misaligned),
+    .csr_w_data(csr_w_data)
 );
 assign pc_src = flush;
 
@@ -322,6 +335,10 @@ assign pc_src = flush;
         ex_mem_result_reg <= 0;
     end
     else if(!stall) begin
+      ex_mem_csr_w_data <= csr_w_data;
+      ex_mem_csr_addr_reg<=id_ex_csr_addr_reg;
+      ex_mem_imm_val_reg <= id_ex_imm_val_reg;
+      ex_mem_csr_func_reg <= id_ex_csr_func_reg;
       ex_mem_result_reg <= id_ex_result_w;
       ex_mem_rd_addr_reg  <= id_ex_rd_addr_reg; // Pass the destination forward
       ex_mem_reg_write_reg <= id_ex_reg_write_reg;
@@ -332,7 +349,7 @@ assign pc_src = flush;
       ex_mem_rs2_val_reg <=  id_ex_rs2_val_reg;
       ex_mem_ram_address_reg <= ex_ram_address_w;
       ex_mem_is_lui_reg  <= id_ex_is_lui_reg;
-      ex_mem_csr_write_enable_reg <= id_ex_csr_write_enable_reg
+      ex_mem_csr_write_enable_reg <= id_ex_csr_write_enable_reg;
     end
 
  end
@@ -341,7 +358,7 @@ assign pc_src = flush;
 
   wire mem_busy_w;
   wire wrote_to_ram;
-  wire [31:0] mem_data_out_w;
+
   reg [4:0] d_mem_wb_rd_reg;
   reg [31:0] d_mem_wb_result_reg;
   reg d_mem_wb_write_reg;
@@ -397,10 +414,11 @@ csr csr_module( //id_ex stage
   .clk(clk),
   .reset(reset),
   .current_privilege(privilege),
-  .csr_addr(id_ex_rd_addr_reg),
-  .csr_func(id_ex_csr_func_reg),
-  .csr_w_data(id_ex_rs1_val_reg),
-  .csr_write_enable(id_ex_csr_write_enable_reg),
+  .csr_addr(ex_mem_csr_addr_reg),
+  .csr_func(ex_mem_csr_func_reg),
+  .csr_w_data(ex_mem_csr_w_data),
+  .csr_imm(ex_mem_imm_val_reg),
+  .csr_write_enable(ex_mem_csr_write_enable_reg),
   .trap_sources(is_trap),
   .trap_instr_pc(id_ex_pc_reg),
   .trap_cause(mcause_id),

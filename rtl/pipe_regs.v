@@ -28,7 +28,7 @@ module fetch_stage(
   assign pc_trap = (pc[1:0] != 2'b00);
 
   initial begin
-    $readmemh("programs/test.hex", instr);
+    $readmemh("D:/u_risc/programs/test.hex", instr);
   end
 
   always @(posedge clk) begin
@@ -95,8 +95,10 @@ module decode_stage(
   output        cpu_halt,
   output        is_auipc,
   output [2:0]  csr_func,
-  output         wrote_to_regfile
-);
+  output        csr_write_enable,
+  output        wrote_to_regfile,
+  output [11:0] csr_addr
+ );
   wire [4:0] rs1_wire;
   wire [4:0] rs2_wire;
   wire [4:0] rd_wire;
@@ -136,7 +138,9 @@ module decode_stage(
     .is_lui(id_is_lui),
     .cpu_halt(cpu_halt),
     .is_auipc(is_auipc),
-    .csr_func(csr_func)
+    .csr_func(csr_func),
+    .csr_write_enable(csr_write_enable),
+    .csr_addr(csr_addr)
   );
 
 
@@ -147,6 +151,7 @@ module decode_stage(
     .rs2(rs2_wire),
     .rd(wb_rd),
     .result(wb_final_data),
+    .csr_write_enable(csr_write_enable),
     .reg_write(wb_reg_write),
     .rs1_val(id_rs1_val),
     .rs2_val(id_rs2_val),
@@ -200,7 +205,8 @@ module execute_stage(
   //Control
   output divider_busy,
   output divider_finished_comb,
-  output reg misaligned
+  output reg misaligned,
+  output [31:0] csr_w_data
 );
 
   wire [31:0] div_result, alu_result;
@@ -241,7 +247,7 @@ module execute_stage(
   assign ex_result = (id_jal_jump_reg || id_jalr_jump_reg) ? id_pc_4_reg:  result;
   wire [31:0] forward_val_a;
   wire [31:0] forward_val_b_inter;
-
+  assign csr_w_data = forward_val_a;
   assign forward_val_a =
 
     (ex_mem_reg_write_reg && (ex_mem_rd != 0) && (ex_mem_rd == id_rs1_addr)) ? ex_mem_result_reg :

@@ -23,7 +23,8 @@ module decoder(
   output reg cpu_halt,
   output reg is_auipc,
   output reg [2:0] csr_func,
-  output reg csr_write_enable
+  output reg csr_write_enable,
+  output reg [11:0] csr_addr
 );
 
   initial begin
@@ -59,49 +60,59 @@ always @(*) begin //Anytime the input signal changes
         3'b001 : begin      //CSRRW
           rs1 = instr[19:15];
           rd = instr[11:7];
+          csr_addr = instr[31:20];
           csr_func = instr[14:12];
           csr_write_enable = 1;
           reg_write = 1;
+          decoder_illegal = 0;
         end
         3'b010 : begin      //CSRRS
           rs1 = instr[19:15];
           csr_func = instr[14:12];
+          csr_addr = instr[31:20];
           csr_write_enable = 1;
           reg_write = 1;
+          decoder_illegal = 0;
         end
         3'b011 : begin      //CSRRC
           rs1 = instr[19:15];
           rd = instr[11:7];
+          csr_addr = instr[31:20];
           csr_func = instr[14:12];
           csr_write_enable = 1;
           reg_write = 1;
+          decoder_illegal = 0;
         end
         3'b100 : begin      //CSRRWI
-          rs1 = instr[19:15];
           rd = instr[11:7];
-          imm = {{20{instr[31]}}, instr[31:20]};
+          csr_addr = instr[31:20];
+          imm = {27'b0, instr[19:15]};
           csr_func = instr[14:12];
           csr_write_enable = 1;
           reg_write = 1;
+          decoder_illegal = 0;
         end
         3'b101 : begin      //CSRRSI
-          rs1 = instr[19:15];
           csr_func = instr[14:12];
-          imm = {{20{instr[31]}}, instr[31:20]};
+           imm = {27'b0, instr[19:15]};
           csr_write_enable = 1;
           reg_write = 1;
+          decoder_illegal = 0;
         end
         3'b110 : begin      //CSRRCI
-          rs1 = instr[19:15];
           rd = instr[11:7];
-          imm = {{20{instr[31]}}, instr[31:20]};;
+          imm = {27'b0, instr[19:15]};
           csr_write_enable = 1;
           csr_func = instr[14:12];
           reg_write = 1;
+          decoder_illegal = 0;
         end
         default : begin
           csr_write_enable = 0;
           reg_write = 0;
+          rs1 = 5'bx;
+          csr_func = 0;
+          decoder_illegal = 1;
         end
       endcase
     end
