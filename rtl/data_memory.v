@@ -17,10 +17,10 @@ addr : [11:2] which address is being accessed (row)
 */
 
 
-reg [31:0] ram [0:1023];
+reg [31:0] ram [0:8095];
 integer i;
 initial begin
-    for (i = 0; i < 1024; i = i + 1) begin
+    for (i = 0; i < 8095; i = i + 1) begin
         ram[i] = 32'h0;
     end
 end

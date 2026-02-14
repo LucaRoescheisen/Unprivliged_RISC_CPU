@@ -7,4 +7,7 @@ SECTIONS {
   . = 0x00000100;
   .text.trap : { *(text.trap)}
 
+  . = 0x0x000F00;
+  .text.test : { *(text.test)}
+
 }

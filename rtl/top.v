@@ -9,7 +9,7 @@ module top(
   wire [1:0] next_privilege;
   always @(posedge clk) begin
     if(reset) privilege <= 2'b11;
-    else      privilege <= 2'b11;
+    else      privilege <= next_privilege;
 
   end
 

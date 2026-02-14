@@ -27,7 +27,9 @@ input instr_correctly_executed, //NOTE :: REMEBER KEEP LOW FOR STALLS
 );
 localparam NO_PRIV = 1;
 
-
+  initial begin
+    next_privilege = 1'b11;
+  end
 
 //MVENDORID : 0xF11
 reg [31:0] mvendorid;
@@ -269,6 +271,15 @@ always @(posedge clk or posedge reset) begin
               3'b110: mscratch <= ~csr_imm & csr_w_data; //CSRRCI
               default : mscratch =32'b0;
             endcase
+          12'h304: begin //MIE
+              3'b001: mie <= csr_w_data;//CSSRW Atomic read-write
+              3'b010: mie <= csr_w_data | mie;//CSSRS
+              3'b011: mie <= ~csr_w_data & mie;//CSSRC
+              3'b100: mie <= csr_imm;//CSSRWI
+              3'b101: mie <= csr_imm | csr_w_data;//CSSRI
+              3'b110: mie <= ~csr_imm & csr_w_data; //CSRRCI
+              default : mie = mie;
+          end
           end
         endcase
       end
