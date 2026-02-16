@@ -42,6 +42,7 @@ always @(*) begin //Anytime the input signal changes
   is_store = 0; decoder_illegal = 0;
   store_type= 0; div_start = 0; is_div_instruction = 0;
   is_lui = 0; is_auipc = 0; csr_write_enable = 0;
+  is_mret = 0;
   case(instr[6:0])     //Identify OP code
     7'b1110011: begin  //E-CALL E-BREAK
       case(instr[31:20])
@@ -57,6 +58,19 @@ always @(*) begin //Anytime the input signal changes
         default: cpu_halt = 0;
       endcase
       case(instr[14:12])
+        3'b000 : begin //SYSTEM FUNCTIONS
+          case (instr[31:20])
+            12'b302: begin
+              is_mret = 1;
+            end
+            default: begin
+              is_mret = 0;
+            end
+          endcase
+
+        end
+
+
         3'b001 : begin      //CSRRW
           rs1 = instr[19:15];
           rd = instr[11:7];

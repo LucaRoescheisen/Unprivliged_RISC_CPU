@@ -51,6 +51,9 @@ module top(
   assign flush = flush_jump | flush_trap | flush_from_interrupt;
   wire cpu_halt;
 
+  //PC Updates
+  wire [31:0] csr_pc_update;
+  wire csr_update_pc;
   //IFID Pipline Registers
   reg [31:0] IF_ID_instr;
   reg [31:0] IF_ID_pc_plus_4;
@@ -72,8 +75,10 @@ module top(
     .flush(flush),
     .cpu_halt(cpu_halt),
     .pc_src(pc_src),
-    .if_instruction(IF_ID_instr_wire),
+    .csr_pc_update(csr_pc_update),
     .pc_target(pc_target),
+    .csr_update_pc(csr_update_pc)
+    .if_instruction(IF_ID_instr_wire),
     .pc_out(pc_out_wire),
     .pc(IF_ID_wire),
     .pc_trap(trap_instr_addr_misaligned)
@@ -427,9 +432,11 @@ csr csr_module( //id_ex stage
   .instr_correctly_executed(instr_correctly_executed),
   .trap_csr_violation(trap_csr_access_violation),
   .csr_r_data(csr_r_data),
+  .next_pc(csr_pc_update),
   .flush_from_interrupt(flush_from_interrupt),
   .next_privilege(next_privilege),
-  .flush_trap(flush_trap)
+  .flush_trap(flush_trap),
+  .csr_update_pc(csr_update_pc)
 );
 
 endmodule

@@ -67,7 +67,18 @@ csrrw: Read the current value of csr register,
     IR                  DONE
     M Extension         DONE
     Pipelining          DONE
-    CSRs
+    CSRs                PARTIAL
+
+    MRET, SRET
+    medeleg, mideleg,
+    mtime, mtimecmp
+    MTIP in MTIP
+    stvec, sepc, sstatus, sret,
+    PMP
+    ecall
+
+
+
     Timers and Interrupts
     I/O, UART
     Virtual Memory

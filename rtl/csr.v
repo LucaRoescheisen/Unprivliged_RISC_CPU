@@ -23,9 +23,14 @@ input instr_correctly_executed, //NOTE :: REMEBER KEEP LOW FOR STALLS
  output reg [31:0] next_pc,
  output reg flush_from_interrupt,
  output reg [1:0] next_privilege,
- output reg flush_trap
+ output reg flush_trap,
+ output reg csr_update_pc
 );
-localparam NO_PRIV = 1;
+localparam SSTATUS_CLEAR_BITS = (1<<1)  |
+                                (1<<5)  |
+                                (1<<8)  |
+                                (1<<18) |
+                                (1<<19);
 
   initial begin
     next_privilege = 1'b11;
@@ -71,6 +76,10 @@ localparam MIE = 3,
   BIT 7     : MPIE : Machine Previous Interrupt Enable
   BIT 12:11 : MPP  : Machine previous privilege
 */
+
+
+
+
 
 
 //misa: 0x301
@@ -200,6 +209,7 @@ end
 wire is_trap = trap_sources;
 wire take_interrupt = mstatus[3] & mie[11] & mip[11]; //global enabled && source enable && source pending
 always @(posedge clk or posedge reset) begin
+  csr_update_pc <= 0;
   if(reset) begin
     mstatus <= 32'b0;
     mepc <= 32'b0;
@@ -227,6 +237,7 @@ always @(posedge clk or posedge reset) begin
 
   end
   else if (is_mret) begin            //Interrupt Handled
+   csr_update_pc <= 1
     next_privilege <= mstatus[MPP_HIGH:MPP_LOW];
     mstatus[MIE] <= mstatus[MPIE]; //Save the previous interrupt bit
     mstatus[MPIE] <= 1'b1;           //Enable interrupts
@@ -237,9 +248,9 @@ always @(posedge clk or posedge reset) begin
     flush_trap <= 0;
     if(csr_write_enable) begin
       if(current_privilege == 2'b11) begin //Make sure we are in machine mode for read and write operations
-         csr_r_data <= mstatus;
         case(csr_addr)
           12'h300: begin //MSTATUS
+          csr_r_data <= mstatus;
             case(csr_func)
               3'b001: mstatus <= csr_w_data;//CSSRW Atomic read-write
               3'b010: mstatus <= csr_w_data | mstatus;//CSSRS
@@ -251,6 +262,7 @@ always @(posedge clk or posedge reset) begin
             endcase
           end
             12'h305: begin //MTVEC
+            csr_r_data <= mtvec;
             case(csr_func)
               3'b001: mtvec <= csr_w_data;//CSSRW Atomic read-write
               3'b010: mtvec <= csr_w_data | mtvec;//CSSRS
@@ -262,6 +274,7 @@ always @(posedge clk or posedge reset) begin
             endcase
           end
           12'h340: begin //MSCRATCH
+          csr_r_data <= mscratch;
             case(csr_func)
               3'b001: mscratch <= csr_w_data;//CSSRW Atomic read-write
               3'b010: mscratch <= csr_w_data | mscratch;//CSSRS
@@ -271,7 +284,9 @@ always @(posedge clk or posedge reset) begin
               3'b110: mscratch <= ~csr_imm & csr_w_data; //CSRRCI
               default : mscratch =32'b0;
             endcase
+          end
           12'h304: begin //MIE
+            case(csr_func)
               3'b001: mie <= csr_w_data;//CSSRW Atomic read-write
               3'b010: mie <= csr_w_data | mie;//CSSRS
               3'b011: mie <= ~csr_w_data & mie;//CSSRC
@@ -279,7 +294,36 @@ always @(posedge clk or posedge reset) begin
               3'b101: mie <= csr_imm | csr_w_data;//CSSRI
               3'b110: mie <= ~csr_imm & csr_w_data; //CSRRCI
               default : mie = mie;
+            endcase
           end
+
+          //Supervisor
+          12'b100: begin
+            csr_r_data <= mstatus & SSTATUS_CLEAR_BITS;
+            case(csr_func)
+              3'b001: begin //CSSRW
+                mstatus <= (mstatus & ~SSTATUS_CLEAR_BITS) & (csr_w_data & SSTATUS_CLEAR_BITS);
+              end
+              3'b010: begin //CSSRS
+                mstatus <= mstatus & (SSTATUS_CLEAR_BITS & csr_w_data);
+              end
+              3'b011: begin //CSSRC
+                mstatus <= mstatus & ~(SSTATUS_CLEAR_BITS & csr_w_data);
+              end
+              3'b100: begin //CSSRWI
+                mstatus <= (mstatus & ~SSTATUS_CLEAR_BITS) & (csr_imm & SSTATUS_CLEAR_BITS);
+              end
+              3'b101: begin //CSSRI
+                mstatus <= (mstatus & ~SSTATUS_CLEAR_BITS) & ((csr_imm | csr_w_data) & SSTATUS_CLEAR_BITS);
+              end
+              3'b110: begin //CSSRCI
+                mstatus <= (mstatus & ~SSTATUS_CLEAR_BITS) & ((~csr_imm & csr_w_data)  & SSTATUS_CLEAR_BITS);
+              end
+
+            endcase
+          end
+
+
           end
         endcase
       end

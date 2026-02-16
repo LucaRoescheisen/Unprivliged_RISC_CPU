@@ -7,8 +7,10 @@ module fetch_stage(
     input flush,
     input cpu_halt,
     input pc_src, /* verilator lint_off UNUSED */  //1 If Branch
-    output [31:0] if_instruction,
+    input [31:0] csr_pc_update,
     input [31:0] pc_target,
+    input csr_update_pc,
+    output [31:0] if_instruction,
     output [31:0] pc_out,
     output reg [31:0] pc, //Program counter (Holds address of current instruction)
     output pc_trap
@@ -42,7 +44,10 @@ module fetch_stage(
        pc <= pc;
       end else if(flush) begin  // BRANCH TAKEN
         pc <= pc_target;  // Jump to target
-    end else begin
+      end else if(csr_update_pc) begin
+        pc <= csr_pc_update;
+      end
+    else begin
         pc <= pc + 4;     // Normal increment
 
     end
