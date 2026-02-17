@@ -3,6 +3,7 @@ module data_memory(
   input clk,
   input reset,
   input flush,
+  input stall,
   input [2:0] load_type,
   input [2:0] store_type,
   input mem_read_en,
@@ -24,14 +25,15 @@ addr : [11:2] which address is being accessed (row)
 reg [31:0] ram [0:8095];
 integer i;
   initial begin
-    $readmemh("D:/u_risc/programs/program.hex", ram);
+    $readmemh("D:/u_risc/programs/fixed_ram.hex", ram);
   end
 
 always @(posedge clk) begin
-  if(reset || flush) begin
+  if(reset || flush || stall) begin
     output_if_instr <= 32'h00000013;
   end
   else begin
+            $display(" word_index=%0d -> instr=0x%08h", instr_fetch_addr, ram[instr_fetch_addr]);
  output_if_instr <= ram[instr_fetch_addr];
   end
 end

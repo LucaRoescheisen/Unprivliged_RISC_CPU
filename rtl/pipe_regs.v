@@ -230,6 +230,10 @@ module execute_stage(
   wire [31:0] target_pc_imm   = id_pc_reg + id_imm_val_reg; // For JAL and Branches
   wire [31:0] target_rs1_imm  = (forward_val_a + id_imm_val_reg) & ~32'h1; //For JALR
   assign ex_jump_branch_taken = id_jal_jump_reg || id_jalr_jump_reg || (id_is_branch_reg && take_branch);
+
+
+  assign flush = id_jal_jump_reg || id_jalr_jump_reg || (id_is_branch_reg && take_branch);
+
   assign ex_pc_target = (id_jalr_jump_reg) ? target_rs1_imm : target_pc_imm;
 
   //RAM Address
@@ -298,19 +302,9 @@ module execute_stage(
   );
 
 
-  reg flush_reg;
 
-always @(posedge clk) begin
-  if (reset) begin
-    flush_reg <= 1'b0;
-  end else begin
-    // Register the branch decision
-    flush_reg <= id_jal_jump_reg || id_jalr_jump_reg ||
-                 (id_is_branch_reg && take_branch);
-  end
-end
 
-assign flush = flush_reg;
+
 
 
 

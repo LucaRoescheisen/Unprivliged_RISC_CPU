@@ -106,7 +106,7 @@ reg [31:0] mie = 32'b00000000000000000000100010001000;
 
 
 //MIE : 0x344  MRW
-reg [31:0] mip = 32'b00000000000000000000100010001000;
+reg [31:0] mip;
 /*
   Interrupt Pending Bits
     Set by hardware
@@ -213,6 +213,9 @@ always @(posedge clk or posedge reset) begin
   if(reset) begin
     mstatus <= 32'b0;
     mepc <= 32'b0;
+    mip <= 32'b0;
+    flush_from_interrupt <= 0;
+     flush_trap <= 0;
   end
   else if(is_trap) begin
     mepc <= trap_instr_pc;
@@ -297,6 +300,17 @@ always @(posedge clk or posedge reset) begin
               3'b101: mie <= csr_imm | csr_w_data;//CSSRI
               3'b110: mie <= ~csr_imm & csr_w_data; //CSRRCI
               default : mie = mie;
+            endcase
+          end
+          12'h344 : begin
+            case(csr_func)
+              3'b001: mip <= csr_w_data;//CSSRW Atomic read-write
+              3'b010: mip <= csr_w_data | mip;//CSSRS
+              3'b011: mip <= ~csr_w_data & mip;//CSSRC
+              3'b100: mip <= csr_imm;//CSSRWI
+              3'b101: mip <= csr_imm | csr_w_data;//CSSRI
+              3'b110: mip <= ~csr_imm & csr_w_data; //CSRRCI
+              default : mip = mip;
             endcase
           end
 

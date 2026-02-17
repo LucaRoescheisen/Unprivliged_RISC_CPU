@@ -14,6 +14,7 @@ module tb_top;
     #6;
     reset = 0;
     #100;
+    $display("RAM dumped to ram_out.hex");
   end
 
 endmodule

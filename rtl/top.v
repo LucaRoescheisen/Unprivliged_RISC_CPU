@@ -58,6 +58,7 @@
   assign flush = flush_jump | flush_trap | flush_from_interrupt;
   wire cpu_halt;
 
+
   //PC Updates
   wire [31:0] csr_pc_update;
   wire csr_update_pc;
@@ -389,6 +390,7 @@ assign pc_src = flush;
     .clk(clk),
     .reset(reset),
     .flush(flush),
+    .stall(stall),
     .load_type(ex_mem_load_type_reg),
     .store_type(ex_mem_store_type_reg),
     .mem_read_en(ex_mem_is_load_reg),
