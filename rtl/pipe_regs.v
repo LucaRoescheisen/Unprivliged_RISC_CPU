@@ -227,7 +227,7 @@ module execute_stage(
 
   wire take_branch;
   wire ex_jump_branch_taken;
-  wire [31:0] target_pc_imm   = id_pc_reg + id_imm_val_reg; // For JAL and Branches
+  wire [31:0] target_pc_imm   = id_pc_reg + id_imm_val_reg ; // For JAL and Branches
   wire [31:0] target_rs1_imm  = (forward_val_a + id_imm_val_reg) & ~32'h1; //For JALR
   assign ex_jump_branch_taken = id_jal_jump_reg || id_jalr_jump_reg || (id_is_branch_reg && take_branch);
 

@@ -191,7 +191,7 @@
   decode_stage decode_stage_mod(
     .clk(clk),
     .IF_ID_instr(IF_ID_instr),
-    .IF_ID_pc(IF_ID_pc_plus_4),
+    .IF_ID_pc(IF_ID_pc),
     .mem_wb_result(mem_data_out_w),
     .wb_rd(mem_wb_rd_reg),
     .ram_rd_reg(ram_wb_rd_reg),
