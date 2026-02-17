@@ -1,9 +1,16 @@
 /* verilator lint_off UNUSED */
 /* verilator lint_off UNDRIVEN */
-module top(
-  input clk,
-  input reset
+(* keep_hierarchy = "yes" *) module top(
+  input wire clk,
+  input wire reset
 );
+
+  wire instr_correctly_executed;
+
+
+
+
+
   //Privilege
   reg [1:0] privilege; //starts at machine priv
   wire [1:0] next_privilege;
@@ -59,14 +66,15 @@ module top(
   reg [31:0] IF_ID_pc_plus_4;
   reg [31:0] IF_ID_pc;
 
+
   //Fetch Wires
-  wire [31:0] IF_ID_instr_wire;
+  wire [31:0] output_if_instr;
   wire pc_src;           //Branches
   wire [31:0] pc_target; //Jump target
   wire [31:0] pc_out_wire;    //Next PC value
   wire [31:0] IF_ID_wire;    //Current PC value
 
-
+  wire [31:0] instr_fetch_addr;
   //**     Fetch Stage     **//
   fetch_stage fetch_stage_mod(
     .clk(clk),
@@ -77,30 +85,30 @@ module top(
     .pc_src(pc_src),
     .csr_pc_update(csr_pc_update),
     .pc_target(pc_target),
-    .csr_update_pc(csr_update_pc)
-    .if_instruction(IF_ID_instr_wire),
+    .csr_update_pc(csr_update_pc),
     .pc_out(pc_out_wire),
     .pc(IF_ID_wire),
-    .pc_trap(trap_instr_addr_misaligned)
+    .pc_trap(trap_instr_addr_misaligned),
+    .instr_fetch_addr(instr_fetch_addr)
   );
 
-  always @(posedge clk) begin //Handle flush and stalling
+  always @(posedge clk or posedge reset) begin //Handle flush and stalling
     if(flush || reset) begin
-      IF_ID_instr <= 32'b0;
+      IF_ID_instr <= 32'h00000013; //NOP
       IF_ID_pc_plus_4 <= 32'b0;
       IF_ID_pc <= 32'b0;
     end else begin
       if(stall) begin
-        IF_ID_instr <= IF_ID_instr;
+        IF_ID_instr <= output_if_instr;
         IF_ID_pc_plus_4 <= IF_ID_pc_plus_4;
         IF_ID_pc <= IF_ID_pc;
       end else if(cpu_halt) begin
-        IF_ID_instr <= IF_ID_instr;
+        IF_ID_instr <= output_if_instr;
         IF_ID_pc_plus_4 <= IF_ID_pc_plus_4;
         IF_ID_pc <= IF_ID_pc;
       end
       else begin
-        IF_ID_instr <= IF_ID_instr_wire;
+        IF_ID_instr <= output_if_instr;
         IF_ID_pc_plus_4 <= pc_out_wire;
         IF_ID_pc <= IF_ID_wire;
       end
@@ -111,12 +119,12 @@ module top(
 
   //Decode Registers
   //Writeback
-  reg [4:0]  mem_wb_rd_reg;
-  reg [4:0] ram_wb_rd_reg;
-  reg [31:0]  mem_wb_result_reg;
-  reg        mem_wb_write_reg;
-  reg [31:0] mem_data_out_reg;
-  reg        mem_wb_is_load_reg;
+  (*KEEP="true"*)  reg [4:0]  mem_wb_rd_reg;
+  (*KEEP="true"*)  reg [4:0] ram_wb_rd_reg;
+  (*KEEP="true"*)  reg [31:0]  mem_wb_result_reg;
+  (*KEEP="true"*)  reg        mem_wb_write_reg;
+  (*KEEP="true"*)  reg [31:0] mem_data_out_reg;
+  (*KEEP="true"*)  reg        mem_wb_is_load_reg;
   //ID-EX Registers
   reg [4:0]  id_rs1_addr_reg;
   reg [4:0]  id_rs2_addr_reg;
@@ -176,7 +184,9 @@ module top(
   wire        id_ex_csr_write_enable_w;
   wire        wrote_to_regfile;
   wire [11:0] id_ex_csr_addr_w;
+  wire        is_mret;
   //**     Decode Stage     **//
+  (*KEEP="true"*)
   decode_stage decode_stage_mod(
     .clk(clk),
     .IF_ID_instr(IF_ID_instr),
@@ -214,7 +224,8 @@ module top(
     .csr_func(id_csr_func_w),
     .csr_write_enable(id_ex_csr_write_enable_w),
     .wrote_to_regfile(wrote_to_regfile),
-    .csr_addr(id_ex_csr_addr_w)
+    .csr_addr(id_ex_csr_addr_w),
+    .is_mret(is_mret)
   );
 
   always @(posedge clk) begin
@@ -227,8 +238,10 @@ module top(
       id_ex_jal_jump_reg  <= 0;
       id_ex_jalr_jump_reg <= 0;
       id_ex_div_instruction_reg <= 0;
+      id_ex_csr_write_enable_reg <= 0;
+      id_ex_imm_val_reg <= 0;
     end
-    else if(!stall && !cpu_halt) begin
+    else begin
       id_ex_pc_reg_plus_4_reg <= IF_ID_pc_plus_4;
       id_ex_pc_reg <= IF_ID_pc;
       id_ex_rs1_val_reg <=id_rs1_val_w;
@@ -338,6 +351,8 @@ assign pc_src = flush;
         ex_mem_is_load_reg   <= 0;
         ex_mem_rd_addr_reg <= 0;
         ex_mem_result_reg <= 0;
+        ex_mem_csr_write_enable_reg <= 0;
+
     end
     else if(!stall) begin
       ex_mem_csr_w_data <= csr_w_data;
@@ -372,15 +387,19 @@ assign pc_src = flush;
    //**     Memory Stage/Writeback     **//
   data_memory ram_unit (
     .clk(clk),
+    .reset(reset),
+    .flush(flush),
     .load_type(ex_mem_load_type_reg),
     .store_type(ex_mem_store_type_reg),
     .mem_read_en(ex_mem_is_load_reg),
     .mem_write_en(ex_mem_is_store_reg),
     .ram_address(ex_mem_ram_address_reg),
     .data_in(ex_mem_rs2_val_reg),
+    .instr_fetch_addr(instr_fetch_addr),
     .data_out(mem_data_out_w),
     .mem_busy(mem_busy_w),
-    .wrote_to_ram(wrote_to_ram)
+    .wrote_to_ram(wrote_to_ram),
+    .output_if_instr(output_if_instr)
 );
   wire early_stall = id_ex_div_instruction_reg && !div_busy_w && !divider_finished_w;
   wire normal_stall = div_busy_w;
@@ -409,7 +428,7 @@ end
 
   //**-----------------------**//
 
-wire instr_correctly_executed = wrote_to_regfile | wrote_to_ram; //Instruction was executed
+assign instr_correctly_executed = wrote_to_regfile | wrote_to_ram; //Instruction was executed
 
 
 
@@ -424,6 +443,7 @@ csr csr_module( //id_ex stage
   .csr_w_data(ex_mem_csr_w_data),
   .csr_imm(ex_mem_imm_val_reg),
   .csr_write_enable(ex_mem_csr_write_enable_reg),
+  .is_mret(is_mret),
   .trap_sources(is_trap),
   .trap_instr_pc(id_ex_pc_reg),
   .trap_cause(mcause_id),
@@ -438,5 +458,6 @@ csr csr_module( //id_ex stage
   .flush_trap(flush_trap),
   .csr_update_pc(csr_update_pc)
 );
+
 
 endmodule

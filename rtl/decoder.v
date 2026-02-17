@@ -24,7 +24,8 @@ module decoder(
   output reg is_auipc,
   output reg [2:0] csr_func,
   output reg csr_write_enable,
-  output reg [11:0] csr_addr
+  output reg [11:0] csr_addr,
+  output reg is_mret
 );
 
   initial begin
@@ -60,7 +61,7 @@ always @(*) begin //Anytime the input signal changes
       case(instr[14:12])
         3'b000 : begin //SYSTEM FUNCTIONS
           case (instr[31:20])
-            12'b302: begin
+            12'h302: begin
               is_mret = 1;
             end
             default: begin
@@ -72,6 +73,7 @@ always @(*) begin //Anytime the input signal changes
 
 
         3'b001 : begin      //CSRRW
+         $display("CSSRW");
           rs1 = instr[19:15];
           rd = instr[11:7];
           csr_addr = instr[31:20];
@@ -231,7 +233,7 @@ always @(*) begin //Anytime the input signal changes
     end
   endcase
 
-   case(instr[6:0])  //Check OP Code again
+  case(instr[6:0])  //Check OP Code again
     7'b0110011 : begin // R-Type
       case(instr[14:12]) //func3
         3'b000 : begin
@@ -265,7 +267,10 @@ always @(*) begin //Anytime the input signal changes
                  $display("R");
 
              end
-              default : alu_op = 5'bx;
+              default : begin
+               alu_op = 5'bx;
+               div_op = 3'bx;
+              end
           endcase
         end
 

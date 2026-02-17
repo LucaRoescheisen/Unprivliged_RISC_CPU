@@ -1,15 +1,19 @@
 /* verilator lint_off UNUSED */
 module data_memory(
   input clk,
+  input reset,
+  input flush,
   input [2:0] load_type,
   input [2:0] store_type,
   input mem_read_en,
   input mem_write_en,
   input [31:0] ram_address,
   input  [31:0] data_in,
+  input [31:0] instr_fetch_addr,
   output reg [31:0] data_out,
   output reg mem_busy,
-  output reg wrote_to_ram
+  output reg wrote_to_ram,
+  output reg [31:0] output_if_instr
 );
 /*
 addr : [1:0] tells which byte is being accessed (column)
@@ -19,10 +23,17 @@ addr : [11:2] which address is being accessed (row)
 
 reg [31:0] ram [0:8095];
 integer i;
-initial begin
-    for (i = 0; i < 8095; i = i + 1) begin
-        ram[i] = 32'h0;
-    end
+  initial begin
+    $readmemh("D:/u_risc/programs/program.hex", ram);
+  end
+
+always @(posedge clk) begin
+  if(reset || flush) begin
+    output_if_instr <= 32'h00000013;
+  end
+  else begin
+ output_if_instr <= ram[instr_fetch_addr];
+  end
 end
 
 always @(posedge clk) begin

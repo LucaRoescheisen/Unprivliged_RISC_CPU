@@ -1,9 +1,11 @@
 
 .equ TRAP_HANDLER, 0x100
 .equ STACK_TOP, 0x7FFC
-    .section .text
-    .globl _start
+
+.section .text.boot
+.globl _start
 _start:
+
   #Setup Trap Vector
   li   t0,   TRAP_HANDLER      #Position of traphandler
   csrw mtvec, t0               #Load position into mtvec

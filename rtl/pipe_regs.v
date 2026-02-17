@@ -10,13 +10,14 @@ module fetch_stage(
     input [31:0] csr_pc_update,
     input [31:0] pc_target,
     input csr_update_pc,
-    output [31:0] if_instruction,
+    input [31:0] mem_instr,
     output [31:0] pc_out,
     output reg [31:0] pc, //Program counter (Holds address of current instruction)
-    output pc_trap
+    output pc_trap,
+    output [31:0] instr_fetch_addr
 );
 
-
+  assign instr_fetch_addr = pc >> 2;
   wire [31:0] pc_4 = pc +4;
   assign pc_out = pc_4;
   /*
@@ -24,14 +25,10 @@ module fetch_stage(
   we dont jump to the same instruction (infinite loop), instead we go to the next instruciton
   */
 
-  reg [31:0] instr [0:512];
-  assign if_instruction = instr[pc >> 2];
+
 
   assign pc_trap = (pc[1:0] != 2'b00);
 
-  initial begin
-    $readmemh("D:/u_risc/programs/test.hex", instr);
-  end
 
   always @(posedge clk) begin
 
@@ -102,7 +99,8 @@ module decode_stage(
   output [2:0]  csr_func,
   output        csr_write_enable,
   output        wrote_to_regfile,
-  output [11:0] csr_addr
+  output [11:0] csr_addr,
+  output        is_mret
  );
   wire [4:0] rs1_wire;
   wire [4:0] rs2_wire;
@@ -118,7 +116,7 @@ module decode_stage(
 
 
 
-  (* dont_touch = "true" *)
+
   decoder decoder_module(
     .instr(IF_ID_instr),
     .rd(rd_wire),
@@ -145,11 +143,11 @@ module decode_stage(
     .is_auipc(is_auipc),
     .csr_func(csr_func),
     .csr_write_enable(csr_write_enable),
-    .csr_addr(csr_addr)
+    .csr_addr(csr_addr),
+    .is_mret(is_mret)
   );
 
 
-  (* dont_touch = "true" *)
   regfile reg_file_module(
     .clk(clk),
     .rs1(rs1_wire),
@@ -213,6 +211,9 @@ module execute_stage(
   output reg misaligned,
   output [31:0] csr_w_data
 );
+  wire [31:0] forward_val_b;
+  wire [31:0] forward_val_a;
+  wire [31:0] forward_val_b_inter;
 
   wire [31:0] div_result, alu_result;
   wire [31:0] alu_b = id_alu_src_reg ? id_imm_val_reg : forward_val_b;
@@ -250,8 +251,7 @@ module execute_stage(
 
   //Result Handling
   assign ex_result = (id_jal_jump_reg || id_jalr_jump_reg) ? id_pc_4_reg:  result;
-  wire [31:0] forward_val_a;
-  wire [31:0] forward_val_b_inter;
+
   assign csr_w_data = forward_val_a;
   assign forward_val_a =
 
@@ -265,18 +265,17 @@ module execute_stage(
     id_rs2_val_reg;
 
 
-  wire [31:0] forward_val_b = id_alu_src_reg ? id_imm_val_reg : forward_val_b_inter;
+  assign forward_val_b = id_alu_src_reg ? id_imm_val_reg : forward_val_b_inter;
 
-  (* dont_touch = "true" *)
+
   alu alu_module(
     .a(forward_val_a),
-    .b(forward_val_b),
+    .b(alu_b),
     .alu_op(id_alu_op_reg),
     .result(alu_result)
   );
 
 
-  (* dont_touch = "true" *)
     divider divider_module(
     .clk(clk),
     .divisor(forward_val_b),
@@ -289,7 +288,7 @@ module execute_stage(
   );
 
 
-  (* dont_touch = "true" *)
+
   branch_unit branch_unit_module(
     .is_branch(id_is_branch_reg),
     .b_type(id_branch_type_reg),

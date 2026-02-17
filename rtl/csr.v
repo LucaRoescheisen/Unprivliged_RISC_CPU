@@ -7,6 +7,7 @@ module csr(
  input [31:0] csr_w_data,
  input [31:0] csr_imm,
  input csr_write_enable,
+ input is_mret,
 //Trap Handling
 
  input        trap_sources,
@@ -33,7 +34,7 @@ localparam SSTATUS_CLEAR_BITS = (1<<1)  |
                                 (1<<19);
 
   initial begin
-    next_privilege = 1'b11;
+    next_privilege = 2'b11;
   end
 
 //MVENDORID : 0xF11
@@ -117,7 +118,6 @@ reg [31:0] mip = 32'b00000000000000000000100010001000;
 
 */
 
-wire is_mret; //(instr == 32'h30200073);
 
 //MTVEC : 0x305 MRW
 reg [31:0] mtvec;
@@ -237,7 +237,7 @@ always @(posedge clk or posedge reset) begin
 
   end
   else if (is_mret) begin            //Interrupt Handled
-   csr_update_pc <= 1
+   csr_update_pc <= 1;
     next_privilege <= mstatus[MPP_HIGH:MPP_LOW];
     mstatus[MIE] <= mstatus[MPIE]; //Save the previous interrupt bit
     mstatus[MPIE] <= 1'b1;           //Enable interrupts
@@ -247,6 +247,7 @@ always @(posedge clk or posedge reset) begin
   else begin
     flush_trap <= 0;
     if(csr_write_enable) begin
+          $display("CSR WRITING!!");
       if(current_privilege == 2'b11) begin //Make sure we are in machine mode for read and write operations
         case(csr_addr)
           12'h300: begin //MSTATUS
@@ -264,7 +265,9 @@ always @(posedge clk or posedge reset) begin
             12'h305: begin //MTVEC
             csr_r_data <= mtvec;
             case(csr_func)
-              3'b001: mtvec <= csr_w_data;//CSSRW Atomic read-write
+              3'b001: begin mtvec <= csr_w_data;//CSSRW Atomic read-write
+                 $display("mtvec");
+              end
               3'b010: mtvec <= csr_w_data | mtvec;//CSSRS
               3'b011: mtvec <= ~csr_w_data & mtvec;//CSSRC
               3'b100: mtvec <= csr_imm;//CSSRWI
@@ -322,18 +325,15 @@ always @(posedge clk or posedge reset) begin
 
             endcase
           end
-
-
-          end
         endcase
+        end
       end
       else begin
-        trap_csr_violation <= 1;
+       // trap_csr_violation <= 1;
        // trap_pc <= current_pc;
       end
     end
   end
-end
 
 
 
