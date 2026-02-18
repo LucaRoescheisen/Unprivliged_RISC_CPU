@@ -33,8 +33,7 @@ always @(posedge clk) begin
     output_if_instr <= 32'h00000013;
   end
   else begin
-            $display(" word_index=%0d -> instr=0x%08h", instr_fetch_addr, ram[instr_fetch_addr]);
- output_if_instr <= ram[instr_fetch_addr];
+    output_if_instr <= ram[instr_fetch_addr];
   end
 end
 

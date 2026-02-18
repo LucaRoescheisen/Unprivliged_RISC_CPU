@@ -385,6 +385,9 @@ assign pc_src = flush;
   reg d_mem_wb_write_reg;
   reg d_mem_wb_is_load_reg;
   reg [31:0] d_mem_data_out_reg;
+
+
+
    //**     Memory Stage/Writeback     **//
   data_memory ram_unit (
     .clk(clk),
