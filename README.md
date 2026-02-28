@@ -48,11 +48,5 @@ The CPU is designed to be synthesizable on FPGA and fully verifiable using assem
 
 - Functional correctness verified using assembly test programs
 - Simulated with Verilog testbenches
-- Example tests include:
-  - Arithmetic: `add`, `sub`, `mul`, `div`
-  - Branching: `beq`, `bne`, `jal`, `jalr`
-  - CSR read/write and trap handling
 - PC behavior checked for loops, jumps, and pipeline synchronization
-    addi t7, t0, 2
-loop:
-    j loop          # Infinite loop
+
