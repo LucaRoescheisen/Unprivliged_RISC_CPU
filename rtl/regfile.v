@@ -34,6 +34,7 @@ assign rs2_val = (rs2 == rd && reg_write && rs2 != 0) ? result : int_regs[rs2];
 
 always @(posedge clk) begin
   if ((reg_write || csr_write_enable) && rd != 0) begin
+    $display("Regfile: x%0d = 0x%08x", rd, result);
     int_regs[rd] <= result;
     wrote_to_regfile <= 1;
   end

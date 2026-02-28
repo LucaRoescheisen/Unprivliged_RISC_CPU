@@ -13,8 +13,7 @@ module tb_top;
     reset = 1;
     #6;
     reset = 0;
-    #100;
-    $display("RAM dumped to ram_out.hex");
+    #1000;
   end
 
 endmodule

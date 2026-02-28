@@ -73,7 +73,6 @@ always @(*) begin //Anytime the input signal changes
 
 
         3'b001 : begin      //CSRRW
-         $display("CSSRW");
           rs1 = instr[19:15];
           rd = instr[11:7];
           csr_addr = instr[31:20];
@@ -139,7 +138,7 @@ always @(*) begin //Anytime the input signal changes
       reg_write = 1'b1;
       is_auipc = 1'b1;
       decoder_illegal = 0;
-      $display("LUI");
+
     end
 
     7'b0110111: begin //LUI
@@ -148,7 +147,7 @@ always @(*) begin //Anytime the input signal changes
       reg_write = 1'b1;
       is_lui = 1'b1;
       decoder_illegal = 0;
-      $display("LUI");
+
     end
 
     7'b0110011: begin //ALU R-Type

@@ -30,26 +30,26 @@ module fetch_stage(
   assign pc_trap = (pc[1:0] != 2'b00);
 
 
-  always @(posedge clk) begin
+reg pc_raw_grab;
 
+always @(posedge clk or posedge reset) begin
     if(reset) begin
-      pc <= 32'h00000000;
-      $display("yooo");
-    end
-    else begin
-      if(stall || cpu_halt) begin
-       pc <= pc;
-      end else if(flush) begin  // BRANCH TAKEN
-        pc <= pc_target;  // Jump to target
-      end else if(csr_update_pc) begin
-        pc <= csr_pc_update;
-      end
-    else begin
-        pc <= pc + 4;     // Normal increment
+        pc <= 32'h0;
+        pc_raw_grab <= 0;
+    end else begin
+        if(stall || cpu_halt)
+            pc <= pc;
+        else if(flush)
+            pc <= pc_target;
+        else if(csr_update_pc)
+            pc <= csr_pc_update;
+        else begin
 
+                pc <= pc + 4;
+
+        end
     end
-    end
-  end
+end
 
 
 endmodule
@@ -209,7 +209,8 @@ module execute_stage(
   output divider_busy,
   output divider_finished_comb,
   output reg misaligned,
-  output [31:0] csr_w_data
+  output [31:0] csr_w_data,
+  output send_to_uart
 );
   wire [31:0] forward_val_b;
   wire [31:0] forward_val_a;
@@ -223,18 +224,21 @@ module execute_stage(
   assign divider_finished_comb = id_div_instruction && divider_finished;
   wire div_busy;
   assign divider_busy = div_busy;
-  wire divider_trigger = id_div_instruction && !div_busy && !divider_finished;
+  wire divider_trigger;
+  assign divider_trigger = id_div_instruction && !div_busy && !divider_finished;
 
   wire take_branch;
   wire ex_jump_branch_taken;
-  wire [31:0] target_pc_imm   = id_pc_reg + id_imm_val_reg ; // For JAL and Branches
-  wire [31:0] target_rs1_imm  = (forward_val_a + id_imm_val_reg) & ~32'h1; //For JALR
+  wire [31:0] target_pc_imm; // For JAL and Branches
+  assign target_pc_imm   = id_pc_reg + id_imm_val_reg;
+  wire [31:0] target_rs1_imm; //For JALR
+  assign target_rs1_imm  = (forward_val_a + id_imm_val_reg ) & ~32'h1;
   assign ex_jump_branch_taken = id_jal_jump_reg || id_jalr_jump_reg || (id_is_branch_reg && take_branch);
 
 
   assign flush = id_jal_jump_reg || id_jalr_jump_reg || (id_is_branch_reg && take_branch);
 
-  assign ex_pc_target = (id_jalr_jump_reg) ? target_rs1_imm : target_pc_imm;
+  assign ex_pc_target = ((id_jalr_jump_reg) ? target_rs1_imm : target_pc_imm);
 
   //RAM Address
   assign ex_ram_address = forward_val_a + id_imm_val_reg;
@@ -270,6 +274,12 @@ module execute_stage(
 
 
   assign forward_val_b = id_alu_src_reg ? id_imm_val_reg : forward_val_b_inter;
+
+
+  //Check whether its part of the memory area or periphercal section
+  assign send_to_uart = ex_ram_address >= 32'h10000004;
+
+
 
 
   alu alu_module(

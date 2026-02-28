@@ -250,7 +250,7 @@ always @(posedge clk or posedge reset) begin
   else begin
     flush_trap <= 0;
     if(csr_write_enable) begin
-          $display("CSR WRITING!!");
+         $display("CSR: x%0d = 0x%08x", csr_func, csr_w_data);
       if(current_privilege == 2'b11) begin //Make sure we are in machine mode for read and write operations
         case(csr_addr)
           12'h300: begin //MSTATUS
@@ -269,7 +269,6 @@ always @(posedge clk or posedge reset) begin
             csr_r_data <= mtvec;
             case(csr_func)
               3'b001: begin mtvec <= csr_w_data;//CSSRW Atomic read-write
-                 $display("mtvec");
               end
               3'b010: mtvec <= csr_w_data | mtvec;//CSSRS
               3'b011: mtvec <= ~csr_w_data & mtvec;//CSSRC

@@ -4,6 +4,7 @@ module data_memory(
   input reset,
   input flush,
   input stall,
+  input id_ex_send_to_uart,
   input [2:0] load_type,
   input [2:0] store_type,
   input mem_read_en,
@@ -38,7 +39,8 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk) begin
-  if(mem_write_en) begin
+  if(mem_write_en && !id_ex_send_to_uart) begin
+        $display("Store: x%0d = 0x%08x", ram_address, data_in);
         case(store_type)
             3'b000: begin // STORE BYTE
                 wrote_to_ram <= 1;
@@ -72,7 +74,8 @@ wire [31:0] current_word = ram[ram_address[11:2]];
 
 always @(posedge clk) begin
 
-  if(mem_read_en) begin
+  if(mem_read_en && !id_ex_send_to_uart) begin
+    $display("Load: x%0d = 0x%08x", ram_address, data_out);
     case(load_type)
       3'b000: //LOAD BYTE
         case(ram_address[1:0])

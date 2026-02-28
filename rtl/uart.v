@@ -2,10 +2,23 @@ module uart(
   input clk,
   input reset,
   input uart_store,
+  input [7:0] uart_send_info,
+  input id_ex_send_to_uart,
   input [7:0] rx,
   output reg tx
 );
+  /*
+  Baudrate : 115200
+  Parity : None
+  Stop bit: 1
+  Data : 8 bit
+
+  */
+
+
+
   localparam FIFO_DEPTH = 16;
+
 
   //TX Variables
   reg [3:0] tx_write_ptr;
@@ -21,13 +34,17 @@ module uart(
   reg baud_tick;
 
   //RX Variables
+  //memory location : 0x10000004 outputs : rx_fifo[rx_read_ptr]
+  //memory location : 0x10000008 lw from rx_fifo read_ptr value
+  //memory location : 0x10000012 for polling if uart is empty
   reg [3:0] rx_write_ptr;
-  reg [3:0] rx_read_ptr;                  //memory location : 0x10000004
-  reg [7:0] rx_fifo [0:FIFO_DEPTH - 1];   //memory location : 0x10000008
+  reg [3:0] rx_read_ptr;
+  reg [7:0] rx_fifo [0:FIFO_DEPTH - 1];
   reg [9:0] rx_shift_reg;
   reg [3:0] rx_shift_bit;
   reg [3:0] rx_fifo_count;
   wire rx_fifo_empty = (rx_fifo_count == 0);
+  wire rx_fifo_full = (rx_fifo_count == 16);
   reg rx_shift_reg_busy;
 
 
@@ -91,7 +108,13 @@ module uart(
       rx_shift_reg_busy <= 0;
     end
     else begin
-      if(rx == 0 && rx_shift_reg_busy == 0) begin
+      if(id_ex_send_to_uart && rx_fifo && !rx_fifo_full) begin
+        rx_fifo[rx_write_ptr] <=uart_send_info;
+        rx_write_ptr <= rx_write_ptr + 1;
+      end
+
+
+      if(rx == 0 && rx_shift_reg_busy == 0 && !rx_fifo_full) begin
         rx_shift_reg_busy <= 1;
         rx_shift_bit <= 0;
       end

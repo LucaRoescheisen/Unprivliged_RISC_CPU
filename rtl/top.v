@@ -90,7 +90,7 @@
     .pc_out(pc_out_wire),
     .pc(IF_ID_wire),
     .pc_trap(trap_instr_addr_misaligned),
-    .instr_fetch_addr(instr_fetch_addr)
+    .instr_fetch_addr(instr_fetch_addr),
   );
 
   always @(posedge clk or posedge reset) begin //Handle flush and stalling
@@ -112,6 +112,7 @@
         IF_ID_instr <= output_if_instr;
         IF_ID_pc_plus_4 <= pc_out_wire;
         IF_ID_pc <= IF_ID_wire;
+
       end
     end
   end
@@ -242,7 +243,7 @@
       id_ex_csr_write_enable_reg <= 0;
       id_ex_imm_val_reg <= 0;
     end
-    else begin
+    else if(!stall) begin
       id_ex_pc_reg_plus_4_reg <= IF_ID_pc_plus_4;
       id_ex_pc_reg <= IF_ID_pc;
       id_ex_rs1_val_reg <=id_rs1_val_w;
@@ -303,6 +304,8 @@
   reg [11:0] ex_mem_csr_addr_reg;
   reg [2:0] ex_mem_csr_func_reg;
   wire [31:0] csr_w_data;
+  wire id_ex_send_to_uart;
+  reg ex_mem_send_to_uart;
  //**     Execute Stage     **//
   execute_stage execute_stage_module(
     .clk(clk),
@@ -341,7 +344,8 @@
     .divider_busy(div_busy_w),
     .divider_finished_comb(divider_finished_w),
     .misaligned(trap_load_store_misaligned),
-    .csr_w_data(csr_w_data)
+    .csr_w_data(csr_w_data),
+    .send_to_uart(id_ex_send_to_uart)
 );
 assign pc_src = flush;
 
@@ -371,6 +375,7 @@ assign pc_src = flush;
       ex_mem_ram_address_reg <= ex_ram_address_w;
       ex_mem_is_lui_reg  <= id_ex_is_lui_reg;
       ex_mem_csr_write_enable_reg <= id_ex_csr_write_enable_reg;
+      ex_mem_send_to_uart <= id_ex_send_to_uart;
     end
 
  end
@@ -394,6 +399,7 @@ assign pc_src = flush;
     .reset(reset),
     .flush(flush),
     .stall(stall),
+   // .send_to_uart(id_ex_send_to_uart),
     .load_type(ex_mem_load_type_reg),
     .store_type(ex_mem_store_type_reg),
     .mem_read_en(ex_mem_is_load_reg),
